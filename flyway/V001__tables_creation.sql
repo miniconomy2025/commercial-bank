@@ -7,7 +7,6 @@ CREATE TABLE banks (
 CREATE TABLE accounts (
     id SERIAL PRIMARY KEY,
     account_number VARCHAR(12) NOT NULL UNIQUE,
-    api_key VARCHAR(256) NOT NULL,
     notification_url VARCHAR(256) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     closed_at TIMESTAMP
