@@ -1,7 +1,7 @@
 ---------- Table creation ----------
 CREATE TABLE banks (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(64) NOT NULL
+    name VARCHAR(64) NOT NULL UNIQUE
 );
 
 CREATE TABLE accounts (
@@ -51,14 +51,3 @@ CREATE TABLE loan_payments (
     transaction_id INT NOT NULL UNIQUE REFERENCES transactions(id),
     is_interest BOOLEAN NOT NULL
 );
-
-
----------- Starter data ----------
-INSERT INTO transaction_statuses (name) VALUES
-('success'),
-('insufficient_funds'),
-('connection_failed');
-
-
-
----------- Starter data ----------

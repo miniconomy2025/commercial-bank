@@ -20,11 +20,12 @@ $$ LANGUAGE plpgsql;
 
 -- Get account_number & callback_url from API key
 CREATE OR REPLACE FUNCTION get_account_details_from_api_key(p_api_key VARCHAR)
-RETURNS VARCHAR AS $$
+RETURNS TABLE(account_number VARCHAR, callback_url VARCHAR) AS $$
 BEGIN
-    RETURN (SELECT account_number, callback_url FROM accounts WHERE api_key = p_api_key);
+    RETURN QUERY
+    SELECT account_number, callback_url FROM accounts WHERE api_key = p_api_key;
 END;
-$$ LANGUAGE sql;
+$$ LANGUAGE plpgsql;
 
 -- =========================
 -- 💰 2. Balance calculation
@@ -48,8 +49,7 @@ BEGIN
     END IF;
 
     SELECT
-        COALESCE(SUM(CASE WHEN to = v_ref_id THEN amount ELSE 0 END), 0) -
-        COALESCE(SUM(CASE WHEN from = v_ref_id THEN amount ELSE 0 END), 0)
+        COALESCE(SUM(CASE WHEN "to" = v_ref_id THEN amount ELSE 0 END), 0)
     INTO v_balance
     FROM transactions t
     JOIN transaction_statuses s ON s.id = t.status_id
@@ -99,7 +99,7 @@ SELECT
     l.interest_rate,
     l.started_at,
     l.write_off,
-    t.to AS account_ref_id,
+    tr.to AS account_ref_id,
     tr.amount AS initial_amount,
     (
         SELECT COALESCE(SUM(t2.amount), 0)
