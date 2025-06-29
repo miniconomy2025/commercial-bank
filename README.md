@@ -6,11 +6,10 @@ Commercial Bank Project Structure:
 
 ```
 commercial-bank/
-├── api/                      # Backend API server
+├── server/                  # Backend server
 │   ├── node_modules/        # Node.js dependencies
 │   ├── src/                 # Source code
 │   │   ├── config/          # Configuration files
-│   │   ├── controllers/     # Route controllers
 │   │   ├── middlewares/     # Express middlewares
 │   │   ├── queries/         # Database queries
 │   │   ├── routes/          # API route definitions
@@ -59,7 +58,7 @@ commercial-bank/
 
 2. Install backend dependencies:
    ```bash
-   cd api
+   cd server
    npm install
    ```
 
@@ -68,23 +67,41 @@ commercial-bank/
    cd ../frontend
    npm install
    ```
+### Running the Server
 
-### Running the Application
+#### 🧪 Development
 
-#### Backend API
+   From the `server` directory:
 
-From the `api` directory:
-```bash
-npm run dev
-```
-This will start the backend server in development mode using `ts-node-dev`.
+   ```bash
+   npm run dev
+   ```
 
-To build the backend:
+   > Make sure you have a `.env.development` file present in the root of the `server` directory.
+
+---
+
+#### 🛠 Build
+
+To compile the backend TypeScript files:
+
 ```bash
 npm run build
 ```
 
-#### Frontend Application
+---
+
+#### 🚢 Production
+
+To run the backend in production mode:
+
+```bash
+npm start
+```
+
+> Ensure a `.env.production` file exists in the `server` directory before starting the app.
+
+### Running the Frontend Application
 
 From the `frontend` directory:
 ```bash
@@ -96,22 +113,6 @@ To build for production:
 ```bash
 npm run build
 ```
-
-## Development Scripts
-
-### Backend Scripts (`api/package.json`)
-- `dev`: Start development server with hot reload
-- `build`: Compile TypeScript to JavaScript
-
-### Frontend Scripts (`frontend/package.json`)
-- `dev`: Start Vite development server
-- `build`: Build production assets
-
-## Additional Resources
-
-- [Entity Relationship Diagram (ERD)](link-to-erd)
-- [API Endpoints Documentation](link-to-api-docs)
-
 ## Contributing
 
 We welcome contributions! Please follow our contribution guidelines:
