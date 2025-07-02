@@ -1,35 +1,33 @@
 -- Utility views, functions, and procs to support API implementation
 
--- =========================
--- 🔐 1. Authentication helpers
--- =========================
 
--- Get local account_id from API key
-CREATE OR REPLACE FUNCTION get_account_id_from_api_key(p_api_key VARCHAR)
+-- ========== 🔐 1. Authentication helpers ========== --
+
+-- Get local account_id from team ID
+CREATE OR REPLACE FUNCTION get_account_id_from_team_id(p_team_id VARCHAR)
 RETURNS INT AS $$
 DECLARE
     v_account_id INT;
 BEGIN
-    SELECT id INTO v_account_id FROM accounts WHERE api_key = p_api_key;
+    SELECT id INTO v_account_id FROM accounts WHERE team_id = p_team_id;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Invalid API key';
+        RAISE EXCEPTION 'Invalid team ID';
     END IF;
     RETURN v_account_id;
 END;
 $$ LANGUAGE plpgsql;
 
--- Get account_number & callback_url from API key
-CREATE OR REPLACE FUNCTION get_account_details_from_api_key(p_api_key VARCHAR)
+-- Get account_number & callback_url from team ID
+CREATE OR REPLACE FUNCTION get_account_details_from_team_id(p_team_id VARCHAR)
 RETURNS TABLE(account_number VARCHAR, callback_url VARCHAR) AS $$
 BEGIN
     RETURN QUERY
-    SELECT account_number, callback_url FROM accounts WHERE api_key = p_api_key;
+    SELECT account_number, callback_url FROM accounts WHERE team_id = p_team_id;
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================
--- 💰 2. Balance calculation
--- =========================
+
+-- ========== 💰 2. Balance calculation ========== --
 
 -- Balance of an account_id
 CREATE OR REPLACE FUNCTION get_account_balance(p_account_id INT)
@@ -59,9 +57,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================
--- ❄️ 3. Frozen state check
--- =========================
+
+-- ========== ❄️ 3. Frozen state check ========== --
 
 CREATE OR REPLACE FUNCTION is_account_frozen(p_account_id INT)
 RETURNS BOOLEAN AS $$
@@ -87,9 +84,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =========================
--- 💳 4. Loan outstanding view
--- =========================
+
+-- ========== 💳 4. Loan outstanding view ========== --
 
 CREATE OR REPLACE VIEW loan_status AS
 SELECT
@@ -111,9 +107,7 @@ FROM loans l
 JOIN transactions tr ON tr.id = l.initial_transaction_id
 JOIN transaction_statuses s ON tr.status_id = s.id AND s.name = 'success';
 
--- =========================
--- 📄 5. Account Statement View
--- =========================
+-- ========== 📄 5. Account Statement View ========== --
 
 CREATE OR REPLACE VIEW account_statement AS
 SELECT
@@ -124,17 +118,16 @@ SELECT
     t.description,
     s.name AS status,
     t.created_at AS timestamp,
-    a.api_key
+    a.team_id
 FROM transactions t
 JOIN transaction_statuses s ON s.id = t.status_id
 JOIN account_refs ar_from ON ar_from.id = t.from
 JOIN account_refs ar_to ON ar_to.id = t.to
-JOIN accounts a ON a.account_number IN (ar_from.account_number, ar_to.account_number) AND a.api_key IS NOT NULL
+JOIN accounts a ON a.account_number IN (ar_from.account_number, ar_to.account_number) AND a.team_id IS NOT NULL
 WHERE a.account_number IN (ar_from.account_number, ar_to.account_number);
 
--- =========================
--- 📌 6. Loan Payment Summary
--- =========================
+
+-- ========== 📌 6. Loan Payment Summary ========== --
 
 CREATE OR REPLACE VIEW loan_payment_summary AS
 SELECT
@@ -145,3 +138,46 @@ SELECT
 FROM loan_payments lp
 JOIN loans l ON lp.loan_id = l.id
 JOIN transactions t ON lp.transaction_id = t.id;
+
+
+-- ========== 🧾 7. Get or Create Account Ref ========== --
+
+
+-- Gets the ID of an account_ref with certain account_number and bank_name
+-- If it does not exist, a new account_ref is created and the new ID returned
+-- E.g. $ SELECT * FROM get_or_create_account_ref_id('200012345678', 'commercial-bank');
+CREATE OR REPLACE FUNCTION get_or_create_account_ref_id(
+    p_account_number VARCHAR,
+    p_bank_name VARCHAR
+) RETURNS INT AS $$
+DECLARE
+    v_bank_id INT;
+    v_account_ref_id INT;
+BEGIN
+    -- Find bank
+    SELECT id INTO v_bank_id
+    FROM banks
+    WHERE name = p_bank_name;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Bank "%" does not exist.', p_bank_name
+            USING ERRCODE = 'foreign_key_violation';
+    END IF;
+
+    -- Check if account_ref exists
+    SELECT id INTO v_account_ref_id
+    FROM account_refs
+    WHERE account_number = p_account_number
+      AND bank_id = v_bank_id;
+
+    -- If no account_ref, create new
+    IF NOT FOUND THEN
+        INSERT INTO account_refs (account_number, bank_id)
+        VALUES (p_account_number, v_bank_id)
+        RETURNING id INTO v_account_ref_id;
+    END IF;
+
+
+    RETURN v_account_ref_id;
+END;
+$$ LANGUAGE plpgsql;
