@@ -102,6 +102,54 @@
       "operation": "migrate",
       "exception": null,
       "licenseFailed": false
+    },
+    {
+      "initialSchemaVersion": null,
+      "targetSchemaVersion": "004",
+      "schemaName": "public",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "001",
+          "description": "tables creation",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./live/V001__tables_creation.sql",
+          "executionTime": 55
+        },
+        {
+          "category": "Versioned",
+          "version": "002",
+          "description": "initial data",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./live/V002__initial_data.sql",
+          "executionTime": 3
+        },
+        {
+          "category": "Versioned",
+          "version": "003",
+          "description": "row deletion policy",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./live/V003__row_deletion_policy.sql",
+          "executionTime": 4
+        },
+        {
+          "category": "Versioned",
+          "version": "004",
+          "description": "generate number functions",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./live/V004__generate_number_functions.sql",
+          "executionTime": 3
+        }
+      ],
+      "migrationsExecuted": 4,
+      "success": true,
+      "flywayVersion": "9.22.3",
+      "database": "bank_db",
+      "warnings": [],
+      "timestamp": "2025-07-02T19:04:58.313509548",
+      "operation": "migrate",
+      "exception": null,
+      "licenseFailed": false
     }
   ]
 }
