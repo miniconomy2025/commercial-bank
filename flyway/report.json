@@ -1,0 +1,107 @@
+{
+  "individualResults": [
+    {
+      "initialSchemaVersion": null,
+      "targetSchemaVersion": null,
+      "schemaName": "public",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "001",
+          "description": "tables creation",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./V001__tables_creation.sql",
+          "executionTime": 50
+        },
+        {
+          "category": "Versioned",
+          "version": "002",
+          "description": "account number function",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./V002__account_number_function.sql",
+          "executionTime": 4
+        },
+        {
+          "category": "Repeatable",
+          "version": "",
+          "description": "generateTransactionNumber",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./R__generateTransactionNumber.sql",
+          "executionTime": 1
+        },
+        {
+          "category": "Repeatable",
+          "version": "",
+          "description": "initial data",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./R__initial_data.sql",
+          "executionTime": 3
+        },
+        {
+          "category": "Repeatable",
+          "version": "",
+          "description": "row deletion policy",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./R__row_deletion_policy.sql",
+          "executionTime": 2
+        }
+      ],
+      "migrationsExecuted": 5,
+      "success": false,
+      "flywayVersion": "9.22.3",
+      "database": "bank_db",
+      "warnings": [],
+      "timestamp": "2025-07-02T17:12:28.227405510",
+      "operation": "migrate",
+      "exception": "Migration R__utils.sql failed\n-----------------------------\nSQL State  : 42703\nError Code : 0\nMessage    : ERROR: column a.api_key does not exist\n  Position: 668\nLocation   : ./R__utils.sql (/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./R__utils.sql)\nLine       : 118\nStatement  : -- \u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\r\n-- 📄 5. Account Statement View\r\n-- \u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\u003d\r\n\r\nCREATE OR REPLACE VIEW account_statement AS\r\nSELECT\r\n    t.transaction_number,\r\n    CASE WHEN ar_to.bank_id \u003d 1 AND ar_to.account_number \u003d a.account_number THEN \u0027incoming\u0027\r\n         ELSE \u0027outgoing\u0027 END AS type,\r\n    t.amount,\r\n    t.description,\r\n    s.name AS status,\r\n    t.created_at AS timestamp,\r\n    a.api_key\r\nFROM transactions t\r\nJOIN transaction_statuses s ON s.id \u003d t.status_id\r\nJOIN account_refs ar_from ON ar_from.id \u003d t.from\r\nJOIN account_refs ar_to ON ar_to.id \u003d t.to\r\nJOIN accounts a ON a.account_number IN (ar_from.account_number, ar_to.account_number) AND a.api_key IS NOT NULL\r\nWHERE a.account_number IN (ar_from.account_number, ar_to.account_number)\n",
+      "licenseFailed": false
+    },
+    {
+      "initialSchemaVersion": null,
+      "targetSchemaVersion": null,
+      "schemaName": "public",
+      "migrations": [],
+      "migrationsExecuted": 0,
+      "success": true,
+      "flywayVersion": "9.22.3",
+      "database": "bank_db",
+      "warnings": [],
+      "timestamp": "2025-07-02T17:13:08.823660311",
+      "operation": "migrate",
+      "exception": null,
+      "licenseFailed": false
+    },
+    {
+      "initialSchemaVersion": null,
+      "targetSchemaVersion": "002",
+      "schemaName": "public",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "001",
+          "description": "tables creation",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./live/V001__tables_creation.sql",
+          "executionTime": 51
+        },
+        {
+          "category": "Versioned",
+          "version": "002",
+          "description": "account number function",
+          "type": "SQL",
+          "filepath": "/home/rec1dite/grad/miniconomy/commercial-bank/flyway/./live/V002__account_number_function.sql",
+          "executionTime": 3
+        }
+      ],
+      "migrationsExecuted": 2,
+      "success": true,
+      "flywayVersion": "9.22.3",
+      "database": "bank_db",
+      "warnings": [],
+      "timestamp": "2025-07-02T17:13:49.906293828",
+      "operation": "migrate",
+      "exception": null,
+      "licenseFailed": false
+    }
+  ]
+}
