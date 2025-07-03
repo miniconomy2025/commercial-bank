@@ -1,15 +1,17 @@
 ---------- Table creation ----------
 CREATE TABLE banks (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(64) NOT NULL UNIQUE
+    name VARCHAR(64) NOT NULL UNIQUE,
+    team_id VARCHAR(32) NOT NULL UNIQUE
 );
 
 CREATE TABLE accounts (
     id SERIAL PRIMARY KEY,
     account_number VARCHAR(12) NOT NULL UNIQUE,
+    team_id VARCHAR(32) NOT NULL UNIQUE,
     notification_url VARCHAR(256) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    closed_at TIMESTAMP
+    created_at NUMERIC(9, 3) NOT NULL,
+    closed_at NUMERIC(9, 3)
 );
 
 CREATE TABLE account_refs (
@@ -32,7 +34,7 @@ CREATE TABLE transactions (
     amount NUMERIC(15,2) NOT NULL,
     description VARCHAR(128) NOT NULL,
     status_id INT NOT NULL REFERENCES transaction_statuses(id),
-    created_at TIMESTAMP NOT NULL DEFAULT now()
+    created_at NUMERIC(9, 3) NOT NULL
 );
 
 CREATE TABLE loans (
@@ -40,7 +42,7 @@ CREATE TABLE loans (
     loan_number VARCHAR(16) NOT NULL UNIQUE,
     initial_transaction_id INT NOT NULL REFERENCES transactions(id),
     interest_rate NUMERIC(8,5) NOT NULL,
-    started_at TIMESTAMP NOT NULL,
+    started_at NUMERIC(9, 3) NOT NULL,
     write_off BOOLEAN NOT NULL
 );
 
