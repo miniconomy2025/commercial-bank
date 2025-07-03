@@ -1,2 +1,5 @@
 .direnv
 .vscode
+
+flyway/report.html
+flyway/report.json
