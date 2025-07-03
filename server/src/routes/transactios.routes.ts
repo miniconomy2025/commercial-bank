@@ -20,11 +20,12 @@ router.get("/transactions", async (req, res) => {
 
 router.post("/transactions", async (req, res) => {
     
-  const {from_account_number, to_account_number,amount, description, timeStamp } = req.body;
+  const { from_account_number, to_account_number, to_bank_name, amount, description, timeStamp } = req.body;
   try {
     const newTransaction = await createTransaction(
-        from_account_number,
         to_account_number,
+        to_bank_name,
+        from_account_number,
         amount,
         description,
         timeStamp
