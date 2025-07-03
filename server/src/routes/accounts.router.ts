@@ -17,7 +17,7 @@ router.get('/accounts', async (req: Request, res: Response) => {
 router.post('/accounts', async (req: Request, res: Response) => {
   const { notification_url ,created_at, bank_name} = req.body;
   try {
-    const banks = await getBanks();
+    const banks = await getBanks(); // can we not do this in the query => pass param to query and select bank before insert?
     const bankId = banks.find(bank => bank.name === bank_name)?.id;
     const newAccount = await createAccount(notification_url, created_at, bankId ?? 1 );
     await insertAccountRef(newAccount.account_number, bankId ?? 1);

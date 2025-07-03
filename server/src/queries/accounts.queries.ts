@@ -3,7 +3,7 @@ import db from "../config/db.config";
 
 // This function serves as an example of how to query the database and will be removed later.
 export const getAllAccounts = async (): Promise<string[]> => {
-  return appConfig.isDev? db.any('SELECT account_number FROM accounts'): [];
+  return appConfig.isDev? db.any('SELECT account_number, team_id FROM accounts'): [];
 };
 
 export const createAccount = async (notification_url: string, created_at: Date, bank_id: Number): Promise<createAccountResponse> => {
