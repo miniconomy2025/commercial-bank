@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
+import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan } from '../queries/loans.queries';
 
 const router = Router()
 

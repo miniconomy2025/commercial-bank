@@ -1,0 +1,61 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Server (Development)",
+            "cwd": "${workspaceFolder}/server",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "skipFiles": ["<node_internals>/**"],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "sourceMaps": true,
+            "outFiles": ["${workspaceFolder}/server/dist/**/*.js"],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "sourceMapPathOverrides": {
+                "../*": "${workspaceFolder}/server/*"
+            }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Server (Production)",
+            "cwd": "${workspaceFolder}/server",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "start"],
+            "skipFiles": ["<node_internals>/**"],
+            "console": "integratedTerminal",
+            "sourceMaps": true,
+            "preLaunchTask": "npm: build",
+            "outFiles": ["${workspaceFolder}/server/dist/**/*.js"],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "sourceMapPathOverrides": {
+                "../*": "${workspaceFolder}/server/*"
+            }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Current TS File",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}/server",
+            "skipFiles": ["<node_internals>/**"],
+            "outFiles": ["${workspaceFolder}/server/dist/**/*.js"],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "sourceMapPathOverrides": {
+                "../*": "${workspaceFolder}/server/*"
+            }
+        }
+    ]
+}

@@ -1,2 +1,5 @@
 .direnv
 *.toml
+.vscode
+flyway/report.html
+flyway/report.json
