@@ -1,0 +1,165 @@
+name: Deploy Backend
+
+on:
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "api/**"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Copy files to EC2 with scp
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: "./api/"
+          target: "/home/${{ vars.EC2_USER }}/cb-backend/"
+          rm: true
+
+      - name: Run remote commands on EC2 and Configure Nginx
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            API_DOMAIN="${{ vars.API_DOMAIN }}"
+            CERTBOT_EMAIL="${{ secrets.CERTBOT_EMAIL }}"
+            APP_DIR="/home/${{ vars.EC2_USER }}/cb-backend/api"
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+            echo "--- Deploying to EC2: $(pwd) ---"
+
+            # Install NVM and Node.js 22.13.0
+            export NVM_DIR="$HOME/.nvm"
+            if [ ! -d "$NVM_DIR" ]; then
+              echo "Installing NVM..."
+              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+            fi
+            source "$NVM_DIR/nvm.sh"
+
+            if ! node -v | grep -q "v22.13.0"; then
+              echo "Installing Node.js v22.13.0..."
+              nvm install 22.13.0
+              nvm alias default 22.13.0
+              nvm use 22.13.0
+            fi
+
+            # Ensure PM2 is installed
+            if ! command -v pm2 &> /dev/null; then
+              echo "Installing PM2..."
+              npm install -g pm2
+            fi
+
+            echo "Writing environment variables to .env..."
+            cat <<EOF > "$APP_DIR/.env"
+            NODE_ENV=production
+            PORT=${{ secrets.PORT }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            CA_CERT_PATH=${{ secrets.CA_CERT_PATH }}
+            SERVER_KEY_PATH=${{ secrets.SERVER_KEY_PATH }}
+            SERVER_CERT_PATH=${{ secrets.SERVER_CERT_PATH }}
+            TIMEOUT=${{ secrets.TIMEOUT }}
+            EOF
+
+            # Install app dependencies
+            echo "Installing app dependencies..."
+            npm ci
+
+            # Build the app
+            echo "Building the app..."
+            npm run build
+
+            # --- NGINX SETUP ---
+            echo "--- Configuring Nginx ---"
+            if ! command -v nginx &> /dev/null; then
+              echo "Installing Nginx..."
+              sudo yum install -y nginx
+              sudo systemctl enable nginx
+            fi
+
+            echo "Configuring 'server_names_hash_bucket_size'..."
+            if ! grep -q "server_names_hash_bucket_size" /etc/nginx/nginx.conf; then
+              sudo sed -i '/http {/a \    server_names_hash_bucket_size 128;' /etc/nginx/nginx.conf
+            else
+              sudo sed -i 's/^\(\s*\)#\?\s*server_names_hash_bucket_size.*/\1server_names_hash_bucket_size 128;/' /etc/nginx/nginx.conf
+            fi
+
+            NGINX_CONF="/etc/nginx/conf.d/cb-api.conf"
+            WEB_DOMAIN="${{ vars.WEB_DOMAIN }}"
+            API_DOMAIN="${{ vars.API_DOMAIN }}"
+            echo "Creating Nginx config file: $NGINX_CONF"
+            sudo tee "$NGINX_CONF" > /dev/null <<EOF
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name $API_DOMAIN;
+
+                # Proxy API requests to Node.js backend
+                location / {
+                    proxy_pass http://localhost:3000;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                    proxy_set_header Host \$host;
+                    proxy_cache_bypass \$http_upgrade;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                }
+            }
+
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name $WEB_DOMAIN;
+
+                root /var/www/frontend;
+                index index.html;
+
+                location / {
+                    try_files \$uri /index.html;
+                }
+            }
+            EOF
+
+            echo "Testing and restarting Nginx..."
+            sudo nginx -t && sudo systemctl restart nginx || { echo "Nginx configuration failed!"; exit 1; }
+
+            echo "Installing Certbot and requesting SSL certificate..."
+            if ! command -v certbot &> /dev/null; then
+              sudo yum install -y epel-release
+              sudo yum install -y certbot python3-certbot-nginx
+            fi
+
+            sudo certbot --nginx --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$API_DOMAIN" -d "$WEB_DOMAIN"
+
+            echo "Reloading Nginx with SSL..."
+            sudo nginx -t && sudo systemctl reload nginx
+
+            # Start/restart commercial-bank-api with PM2
+            echo "Starting/Restarting commercial-bank-api with PM2..."
+            if pm2 show commercial-bank-api &> /dev/null; then
+              pm2 restart commercial-bank-api
+            else
+              pm2 start dist/server.js --name commercial-bank-api
+            fi
+            pm2 save
+
+            echo "Deployment complete."
