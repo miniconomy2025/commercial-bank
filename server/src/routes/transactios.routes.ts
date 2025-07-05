@@ -46,7 +46,7 @@ router.get("/transactions/:id", async (req, res) => {
     if (transaction) {
       res.status(200).json(transaction);
     } else {
-      res.status(404).json("Transaction not found" );
+      res.status(404).json({error: "Transaction not found"});
     }
   } catch (error) {
     logger.error("Error fetching transaction:", error);
