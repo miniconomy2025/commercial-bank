@@ -1,0 +1,24 @@
+.chart {
+  margin-bottom: 20px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+}
+
+.chart-figure {
+  height: 180px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

@@ -1,0 +1,23 @@
+.aggregation-container {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.charts-column {
+  flex: 2;
+}
+
+.charts-panel {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  flex: 2;
+}
+
+.chart-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
