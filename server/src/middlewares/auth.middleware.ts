@@ -5,6 +5,7 @@ import { getAccountFromOrganizationUnit } from '../queries/auth.queries';
 declare module 'express-serve-static-core' {
   interface Request {
     account?: Account;
+    teamId?: string;
   }
 }
 
@@ -17,19 +18,22 @@ export async function authMiddleware(req: any, res: any, next: any){
   }
 
   try {
-    const organizationUnit = cert.subject.OU; 
+    const organizationUnit = cert.subject.OU;
     if (!organizationUnit) {
       res.status(403).json({ error: 'Organization unit is required in the certificate' });
       return;
     }
     
-    const account = await getAccountFromOrganizationUnit(organizationUnit);
-    if (!account) {
-      res.status(403).json({ error: 'No account found for the provided organization unit' });
-      return;
+    if (!(req.method === 'POST' && req.path === '/accounts')) {
+      const account = await getAccountFromOrganizationUnit(organizationUnit);
+      if (!account) {
+        res.status(403).json({ error: 'No account found for the provided organization unit' });
+        return;
+      }
+      req.account = account;
+    } else {
+      req.teamId= organizationUnit;
     }
-
-    req.account = account;
     
     next();
   } catch (error) {
