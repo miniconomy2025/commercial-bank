@@ -1,36 +1,31 @@
-CREATE OR REPLACE PROCEDURE your_procedure_name(
+CREATE OR REPLACE PROCEDURE create_account(
     bank_name VARCHAR(255),
-    created_at TIMESTAMP,
-    notification_url VARCHAR(255)
-)
+    created_at NUMERIC(9, 3),
+    notification_url VARCHAR(255),
+    team_id VARCHAR(32),
+    OUT account_number VARCHAR(16)
+) 
 LANGUAGE plpgsql
 AS $$
-DECLARE
-    v_inserted_id INTEGER;
 BEGIN
-    START TRANSACTION;
-    
+    DECLARE
+        bank_id INTEGER := (SELECT id FROM banks WHERE banks.name = create_account.bank_name);
+        generated_account_number VARCHAR(16);
     BEGIN
-
-        DECLARE bank_id INTEGER := (SELECT id FROM banks WHERE [name] = bank_name);
-        INSERT INTO accounts (
-            column1, column2,
-            column3, created_at
-        ) VALUES (
-            p_param1,
-            p_param2,
-            p_param3,
-            NOW()
-        ) RETURNING id INTO v_inserted_id;
+        IF EXISTS (SELECT 1 FROM accounts WHERE accounts.team_id = create_account.team_id) THEN
+            account_number := 'account exist';
+            RETURN;
+        END IF;
         
-        COMMIT;
+        generated_account_number := generate_unique_account_number();
         
-        RAISE NOTICE 'Successfully inserted record with ID: %', v_inserted_id;
+        INSERT INTO accounts (account_number, team_id, notification_url, created_at)
+        VALUES (generated_account_number, create_account.team_id, create_account.notification_url, create_account.created_at);
         
-    EXCEPTION
-        WHEN OTHERS THEN
-            ROLLBACK;
-            RAISE EXCEPTION 'Failed to insert record: %', SQLERRM;
+        INSERT INTO account_refs (account_number, bank_id)
+        VALUES (generated_account_number, bank_id);
+        
+        account_number := generated_account_number;
     END;
 END;
 $$;
