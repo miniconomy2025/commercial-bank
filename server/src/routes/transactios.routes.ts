@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import appConfig from "../config/app.config";
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
-import { timeStamp } from 'console';
+import { logger } from '../utils/logger';
 
 const router = Router()
 
@@ -13,7 +12,7 @@ router.get("/transactions", async (req, res) => {
     const transactions = await getAllTransactions(from, to, onlySuccessful);
     res.status(200).json(transactions);
   } catch (error) {
-    appConfig.isDev? console.error("Error fetching transactions:", error) : null;
+    logger.error("Error fetching transactions:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -32,7 +31,7 @@ router.post("/transactions", async (req, res) => {
     );
     res.status(200).json(newTransaction);
   } catch (error) {
-    console.error("Error creating transaction:", error);
+    logger.error("Error creating transaction:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -48,7 +47,7 @@ router.get("/transactions/:id", async (req, res) => {
       res.status(404).json("Transaction not found" );
     }
   } catch (error) {
-    console.error("Error fetching transaction:", error);
+    logger.error("Error fetching transaction:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

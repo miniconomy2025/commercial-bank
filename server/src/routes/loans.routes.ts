@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan } from '../queries/loans.queries';
+import { logger } from '../utils/logger';
 
 const router = Router()
 
@@ -15,7 +16,7 @@ router.post("/loan", async (req, res) => {
     res.status(200).json(loanResult);
   }
   catch (error) {
-    console.error("Error creating loan:", error);
+    logger.error("Error creating loan:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -31,7 +32,7 @@ router.get("/loan", async (req, res) => {
     res.status(200).json(loanSummaries);
   }
   catch (error) {
-    console.error(`Error getting loans for account ${accNo}:`, error);
+    logger.error(`Error getting loans for account ${accNo}:`, error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -50,7 +51,7 @@ router.post("/loan/:loan_number/pay", async (req, res) => {
     res.status(200).json(repayment);
   }
   catch (error) {
-    console.error("Error repaying loan:", error);
+    logger.error("Error repaying loan:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -67,7 +68,7 @@ router.get("/loan/:loan_number", async (req, res) => {
     res.status(200).json(loanDetails);
   }
   catch (error) {
-    console.error("Error getting loan details:", error);
+    logger.error("Error getting loan details:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

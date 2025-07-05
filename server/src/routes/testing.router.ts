@@ -2,6 +2,7 @@ import { Router } from "express";
 import appConfig from "../config/app.config";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { HttpClient } from "../utils/http-client";
+import { logger } from "../utils/logger";
 
 const router = Router();
 const httpClient = new HttpClient();
@@ -10,7 +11,7 @@ router.get("/status", authMiddleware, (req, res) => {
   if (appConfig.isDev) {
     const { name, verbose } = req.query;
     if (verbose) {
-      console.log("Received GET request with query parameters:", { name, verbose });
+      logger.info("Received GET request with query parameters:", { name, verbose });
     }
     
     res.json({ status: "ok", message: "mTLS endpoint is working!" });
@@ -21,56 +22,15 @@ router.get("/status", authMiddleware, (req, res) => {
         query: { name: "Indie", verbose: true },
       })
       .subscribe({
-        next: (response) => console.log("Data:", response.data),
-        error: (err) => console.error(err.message),
-      });
-
-    httpClient
-      .request({
-        url: "https://localhost:8443/data",
-        method: "POST",
-        body: { key: "value" },
-      })
-      .subscribe({
-        next: (response) => console.log("Data:", response.data),
-        error: (err) => console.error(err.message),
-      });
-
-    httpClient
-      .request({
-        url: "https://localhost:8443/data",
-        method: "DELETE",
-      })
-      .subscribe({
-        next: (response) => console.log("Data:", response.data),
-        error: (err) => console.error(err.message),
-      });
-
-      httpClient
-      .request({
-        url: "https://localhost:8443/data",
-        method: "PUT",
-      })
-      .subscribe({
-        next: (response) => console.log("Data:", response.data),
-        error: (err) => console.error(err.message),
-      });
-
-       httpClient
-      .request({
-        url: "https://localhost:8443/data",
-        method: "PATCH",
-      })
-      .subscribe({
-        next: (response) => console.log("Data:", response.data),
-        error: (err) => console.error(err.message),
+        next: (response) => logger.info("Data:", response.data),
+        error: (err) => logger.error(err.message),
       });
   }
 });
 
 router.post("/status", authMiddleware, (req, res) => {
     if (appConfig.isDev) {
-        console.log("Received POST request with body:", req.body);
+        logger.info("Received POST request with body:", req.body);
         res.json({ status: "ok", message: "mTLS POST endpoint is working!" });
     }
 });
