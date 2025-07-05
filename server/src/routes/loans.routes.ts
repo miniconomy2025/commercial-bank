@@ -9,8 +9,7 @@ const router = Router()
 // Take out a loan
 router.post("/loan", async (req, res) => {
   const { amount } = req.body;
-  const borrowerAccNo = "200012341234"; // TODO: Grab from certificate
-
+  const borrowerAccNo = req.account!.accountNumber;
   try {
     const loanResult = await createLoan(borrowerAccNo, amount);
     res.status(200).json(loanResult);
@@ -25,7 +24,7 @@ router.post("/loan", async (req, res) => {
 // List all loans for the account
 // NOTE: Only the original borrower can get details for their loan
 router.get("/loan", async (req, res) => {
-  const accNo = "200012341234"; // TODO: Grab from certificate
+  const accNo = req.account!.accountNumber;
 
   try {
     const loanSummaries = await getLoanSummariesForAccount(accNo);
@@ -44,7 +43,7 @@ router.post("/loan/:loan_number/pay", async (req, res) => {
   const { amount } = req.body;
   const { loan_number } = req.params;
 
-  const accNo = "200012341234"; // TODO: Grab from certificate
+  const accNo = req.account!.accountNumber;
 
   try {
     const repayment = await repayLoan(loan_number, accNo, amount);
@@ -61,7 +60,7 @@ router.post("/loan/:loan_number/pay", async (req, res) => {
 // NOTE: Only the account which took out the loan can get loan details
 router.get("/loan/:loan_number", async (req, res) => {
   const { loan_number } = req.params;
-  const accNo = "200012341234"; // TODO: Grab from certificate
+  const accNo = req.account!.accountNumber;
 
   try {
     const loanDetails = await getLoanDetails(loan_number, accNo);

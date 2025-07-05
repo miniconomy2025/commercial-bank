@@ -6,7 +6,7 @@ const router = Router()
 
 router.get("/transactions", async (req, res) => {
   try {
-    const from = (req.query.from as string);
+    const from = req.account!.accountNumber;
     const to = (req.query.to as string);
     const onlySuccessful = req.query.onlySuccessful === 'true';
     const transactions = await getAllTransactions(from, to, onlySuccessful);
@@ -19,7 +19,9 @@ router.get("/transactions", async (req, res) => {
 
 router.post("/transactions", async (req, res) => {
     
-  const { from_account_number, to_account_number, to_bank_name, amount, description, timeStamp } = req.body;
+  const { to_account_number, to_bank_name, amount, description, timeStamp } = req.body;
+  const from_account_number = req.account!.accountNumber;
+  
   try {
     const newTransaction = await createTransaction(
         to_account_number,
