@@ -114,7 +114,7 @@ jobs:
             echo "Creating Nginx config file: $NGINX_CONF"
 
             sudo tee "$NGINX_CONF" > /dev/null <<EOF
-            load_module modules/ngx_stream_module.so;
+            load_module /usr/lib64/nginx/modules/ngx_stream_module.so;
             worker_processes auto;
 
             events {
