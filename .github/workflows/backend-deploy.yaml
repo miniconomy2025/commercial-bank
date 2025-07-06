@@ -5,7 +5,7 @@ on:
   #   branches:
   #     - main
   #   paths:
-  #     - "api/**"
+  #     - "server/**"
   workflow_dispatch: {}
 
 jobs:
@@ -20,6 +20,12 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Write server.key from secret
+        run: |
+          mkdir -p ./server
+          echo "${{ secrets.SERVER_PKEY }}" > ./server/server.key
+          chmod 600 ./server/server.key
+
       - name: Copy files to EC2 with scp
         uses: appleboy/scp-action@v1
         with:
@@ -27,8 +33,8 @@ jobs:
           username: ${{ vars.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          source: "./api/"
-          target: "/home/${{ vars.EC2_USER }}/cb-backend/"
+          source: "./server/"
+          target: "/home/${{ vars.EC2_USER }}/cb-api-server/"
           rm: true
 
       - name: Run remote commands on EC2 and Configure Nginx
@@ -41,7 +47,7 @@ jobs:
           script: |
             API_DOMAIN="${{ vars.API_DOMAIN }}"
             CERTBOT_EMAIL="${{ secrets.CERTBOT_EMAIL }}"
-            APP_DIR="/home/${{ vars.EC2_USER }}/cb-backend/api"
+            APP_DIR="/home/${{ vars.EC2_USER }}/cb-api-server/server"
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
             echo "--- Deploying to EC2: $(pwd) ---"
@@ -68,14 +74,14 @@ jobs:
             fi
 
             echo "Writing environment variables to .env..."
-            cat <<EOF > "$APP_DIR/.env"
+            cat <<EOF > "$APP_DIR/.env.production"
             NODE_ENV=production
-            PORT=${{ secrets.PORT }}
+            PORT=3000
             DATABASE_URL=${{ secrets.DATABASE_URL }}
-            CA_CERT_PATH=${{ secrets.CA_CERT_PATH }}
-            SERVER_KEY_PATH=${{ secrets.SERVER_KEY_PATH }}
-            SERVER_CERT_PATH=${{ secrets.SERVER_CERT_PATH }}
-            TIMEOUT=${{ secrets.TIMEOUT }}
+            CA_CERT_PATH=ca.crt
+            SERVER_KEY_PATH=server.key
+            SERVER_CERT_PATH=server.crt
+            TIMEOUT=6000
             EOF
 
             # Install app dependencies
@@ -153,12 +159,19 @@ jobs:
             echo "Reloading Nginx with SSL..."
             sudo nginx -t && sudo systemctl reload nginx
 
+            # Copy all files except src/, node_modules/, and dist
+            echo "Copying runtime files to dist/ ..."
+            mkdir -p dist
+            rsync -av --exclude='src' --exclude='node_modules' --exclude='dist' ./ dist/
+
             # Start/restart commercial-bank-api with PM2
             echo "Starting/Restarting commercial-bank-api with PM2..."
+            cd dist
+            export NODE_ENV=production 
             if pm2 show commercial-bank-api &> /dev/null; then
               pm2 restart commercial-bank-api
             else
-              pm2 start dist/server.js --name commercial-bank-api
+              pm2 start server.js --name commercial-bank-api
             fi
             pm2 save
 

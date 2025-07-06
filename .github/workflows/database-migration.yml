@@ -1,4 +1,4 @@
-name: Database Migrations with Flyway
+name: Database Migrations
 
 on:
   # push:
@@ -6,7 +6,7 @@ on:
   #     - main
   #   paths:
   #     - "src/flyway/**"
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 jobs:
   FlywayMigration:
@@ -20,7 +20,7 @@ jobs:
       - name: Execute Flyway Migrations
         run: |
           docker run --rm \
-            --volume ${GITHUB_WORKSPACE}/src/flyway:/flyway/sql:ro \
+            --volume ${GITHUB_WORKSPACE}/flyway:/flyway/sql:ro \
             redgate/flyway \
-            -url="${{ vars.DATABASE_URL }}" \
+            -url="${{ secrets.DATABASE_URL }}" \
             migrate
