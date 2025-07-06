@@ -1,10 +1,10 @@
 import dotenv from 'dotenv';
+dotenv.config();
 
 const NODE_ENV = process.env.NODE_ENV;
+dotenv.config({ path: `.env.${NODE_ENV}` });
 
 if (!NODE_ENV) throw new Error('Missing required env: NODE_ENV');
-
-dotenv.config({ path: `.env.${NODE_ENV}` });
 
 if (!process.env.PORT) throw new Error('Missing required env: PORT');
 if (!process.env.DATABASE_URL) throw new Error('Missing required env: DATABASE_URL');

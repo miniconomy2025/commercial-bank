@@ -43,12 +43,12 @@ export const createTransaction = async (
           $5, $6, 1, $7
         )
         RETURNING id AS transaction_id, transaction_number, status_id
-      )
-    SELECT 
-      i.transaction_number,
-      s.name AS status_string
-    FROM inserted i
-    JOIN transaction_statuses s ON s.id = i.status_id;
+    )
+SELECT 
+    i.transaction_number,
+    s.name AS status_string
+FROM inserted i
+JOIN transaction_statuses s ON s.id = i.status_id;
   `,
     [sender_account_number, sender_bank_name, recipient_account_number, recipient_bank_name, amount, description, getSimTime()]
   );

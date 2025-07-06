@@ -17,32 +17,24 @@ export const doesAccountExist = async (teamId: string): Promise<boolean> => {
   return !!account;
 };
 
-export const createAccount = async (notificationUrl: string, teamId: string): Promise<createAccountResponse> => {
-  const account = await db.tx(async (t) => {
-    return t.one(
-      `
-      WITH selected_bank AS (
-        SELECT id AS bank_id FROM banks WHERE name = 'commercial-bank' LIMIT 1
-      ), inserted_account AS (
-        INSERT INTO accounts (account_number, team_id, notification_url, created_at)
-        SELECT generate_unique_account_number(), $1, $2, $3
-        FROM selected_bank
-        RETURNING account_number, created_at
-      ), inserted_ref AS (
-        INSERT INTO account_refs (account_number, bank_id)
-        SELECT inserted_account.account_number, selected_bank.bank_id
-        FROM inserted_account, selected_bank
-      )
-      SELECT account_number, created_at FROM inserted_account
-      `,
-      [teamId, notificationUrl, getSimTime()]
-    );
-  });
+export interface CreateAccountResult {
+    account_number: string;
+}
 
-  return account;
-};
-
-export type createAccountResponse = {
-  account_number: string;
-  created_at: SimTime;
-};
+export const createAccount = async (
+    createdAt: number,
+    notificationUrl: string,
+    teamId: string
+): Promise<CreateAccountResult> => {
+    try {
+        const result = await db.proc<CreateAccountResult>(
+            'create_account',
+            [createdAt, notificationUrl, teamId, null]
+        );
+        
+        return result ? result : { account_number: "" };
+    } catch (error) {
+        console.error('Error creating account:', error);
+        throw error;
+    }
+}
