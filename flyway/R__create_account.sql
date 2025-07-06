@@ -1,16 +1,16 @@
 CREATE OR REPLACE PROCEDURE create_account(
-    bank_name VARCHAR(255),
     created_at NUMERIC(9, 3),
     notification_url VARCHAR(255),
     team_id VARCHAR(32),
-    OUT account_number VARCHAR(16)
+    OUT account_number VARCHAR(12)
 ) 
 LANGUAGE plpgsql
 AS $$
 BEGIN
     DECLARE
-        bank_id INTEGER := (SELECT id FROM banks WHERE banks.name = create_account.bank_name);
-        generated_account_number VARCHAR(16);
+        bank_id INTEGER := (SELECT id FROM banks WHERE banks.name = 'commercial-bank');
+        generated_account_number VARCHAR(12);
+    
     BEGIN
         IF EXISTS (SELECT 1 FROM accounts WHERE accounts.team_id = create_account.team_id) THEN
             account_number := 'account exist';
