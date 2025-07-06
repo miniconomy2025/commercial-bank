@@ -1,5 +1,5 @@
 import db from "../config/db.config";
-import { SimTime } from "../utils/time";
+import { getSimTime, SimTime } from "../utils/time";
 
 export const getAllTransactions = async (
   from: string,
@@ -24,25 +24,23 @@ export const getTransactionStatusId = async (statusName: string): Promise<number
 
 // TODO: Validate amount > 0
 export const createTransaction = async (
-    recipient_account_number: string, 
-    recipient_bank_name: string, 
-    sender_account_number: string, 
+    recipient_account_number: string,
+    sender_account_number: string,
     amount:number,
     description: string,
-    timestamp: number
+    sender_bank_name: string = 'commercial-bank',
+    recipient_bank_name: string = 'commercial-bank',
   )
 : Promise<CreateTransactionResult> => {
   return db.one(
   `WITH
-      from_ref AS get_or_create_account_ref_id($1, 'commercial-bank'),
-      to_ref AS get_or_create_account_ref_id($2, $3),
       inserted AS (
         INSERT INTO transactions (transaction_number, "from", "to", amount, description, status_id, created_at)
         VALUES (
           generate_unique_transaction_number(),
-          (SELECT id FROM from_ref),
-          (SELECT id FROM to_ref),
-          $4, $5, 1, $6
+          get_or_create_account_ref_id($1, $2),
+          get_or_create_account_ref_id($3, $4),
+          $5, $6, 1, $7
         )
         RETURNING id AS transaction_id, transaction_number, status_id
       )
@@ -52,7 +50,7 @@ export const createTransaction = async (
     FROM inserted i
     JOIN transaction_statuses s ON s.id = i.status_id;
   `,
-    [sender_account_number, recipient_account_number, recipient_bank_name, amount, description, timestamp]
+    [sender_account_number, sender_bank_name, recipient_account_number, recipient_bank_name, amount, description, getSimTime()]
   );
 }
 

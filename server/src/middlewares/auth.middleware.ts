@@ -9,6 +9,11 @@ declare module 'express-serve-static-core' {
   }
 }
 
+const bypassCheckRoutes = [
+  { method: 'POST', path: '/accounts' },
+  { method: 'POST', path: '/simulation/start' },
+];
+
 export async function authMiddleware(req: any, res: any, next: any){
   const cert = req.socket.getPeerCertificate();
 
@@ -24,7 +29,11 @@ export async function authMiddleware(req: any, res: any, next: any){
       return;
     }
     
-    if (!(req.method === 'POST' && req.path === '/accounts')) {
+    const shouldBypassCheck = bypassCheckRoutes.some(
+      (route) => route.method === req.method && route.path === req.path
+    );
+
+    if (!shouldBypassCheck) {
       const account = await getAccountFromOrganizationUnit(organizationUnit);
       if (!account) {
         res.status(403).json({ error: 'No account found for the provided organization unit' });
