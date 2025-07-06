@@ -116,8 +116,6 @@ jobs:
             sudo tee "$NGINX_CONF" > /dev/null <<EOF
             worker_processes auto;
 
-            worker_processes auto;
-
             events {
                 worker_connections 1024;
             }
