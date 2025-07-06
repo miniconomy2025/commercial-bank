@@ -131,7 +131,7 @@ jobs:
                     server 127.0.0.1:8443;
                 }
 
-                map $ssl_preread_server_name $backend {
+                map \$ssl_preread_server_name \$backend {
                     commercial-bank-api.subspace.site express_tls_backend;
                     commercial-bank.subspace.site frontend_https_backend;
                     default                       frontend_https_backend;
