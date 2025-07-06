@@ -141,7 +141,7 @@ jobs:
                     listen 443;
                     listen [::]:443;
                     ssl_preread on;
-                    proxy_pass \$backend;
+                    proxy_pass $backend;
                 }
             }
 
@@ -181,8 +181,6 @@ jobs:
             EOF
 
 
-            echo "Testing and restarting Nginx..."
-            sudo systemctl restart nginx || { echo "Nginx configuration failed!"; exit 1; }
 
             echo "Installing Certbot and requesting SSL certificate..."
             if ! command -v certbot &> /dev/null; then
@@ -192,7 +190,8 @@ jobs:
 
             sudo certbot --nginx --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$API_DOMAIN" -d "$WEB_DOMAIN"
 
-            sudo nginx -t || { echo "Nginx configuration test failed!"; exit 1; }
+            echo "Testing and restarting Nginx..."
+            sudo nginx -t && sudo systemctl restart nginx || { echo "Nginx configuration failed!"; exit 1; }
 
             echo "Reloading Nginx with SSL..."
             sudo nginx -t && sudo systemctl reload nginx
