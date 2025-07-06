@@ -67,10 +67,10 @@ export const createLoan = async (
       INSERT INTO loans (
         loan_number, initial_transaction_id, interest_rate, started_at, write_off
       ) VALUES (
-        generate_unique_loan_number(), $1, $2, now(), false
+        generate_unique_loan_number(), $1, $2, $3, false
       ) RETURNING loan_number, initial_transaction_id, interest_rate, started_at, write_off
       `,
-      [ transaction.transaction_id, interestRate ]
+      [ transaction.transaction_id, interestRate, getSimTime() ]
     );
 
     return { success: true, ...loan };
