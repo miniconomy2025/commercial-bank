@@ -59,7 +59,7 @@ export const createLoan = async (
 
 
     // Insert transaction
-    const transaction = await createTransaction(accountNumber, 'commercial-bank', bankAccNo, amount, `Loan disbursement to ${accountNumber}`, getSimTime());
+    const transaction = await createTransaction(accountNumber, bankAccNo, amount, `Loan disbursement to ${accountNumber}`);
 
     // Insert loan
     const loan = await t.one<LoanResult>(
@@ -181,7 +181,7 @@ export const repayLoan = async (
 
 
     // Create repayment transaction
-    const transaction = await createTransaction(bankAccNo, 'commercial-bank', accountNumber, repayment, `Repayment of loan ${loanNumber}`, getSimTime());
+    const transaction = await createTransaction(bankAccNo, accountNumber, repayment, `Repayment of loan ${loanNumber}`);
 
     // Link repayment to the loan
     await t.none(`

@@ -22,6 +22,7 @@ const appConfig = {
   keyPath: process.env.SERVER_KEY_PATH,
   certPath: process.env.SERVER_CERT_PATH,
   timeout: process.env.TIMEOUT ? Number(process.env.TIMEOUT) : 60000,
+  thohHost: process.env.THOH_HOST || 'https://localhost:8443',
 };
 
 export default appConfig;
