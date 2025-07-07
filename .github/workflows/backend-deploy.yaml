@@ -37,7 +37,7 @@ jobs:
           target: "/home/${{ vars.EC2_USER }}/cb-api-server/"
           rm: true
 
-      - name: Run remote commands on EC2 and Configure Nginx
+      - name: Run remote commands on EC2 (no Nginx)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.EC2_HOST }}
@@ -46,7 +46,6 @@ jobs:
           port: 22
           script: |
             API_DOMAIN="${{ vars.API_DOMAIN }}"
-            CERTBOT_EMAIL="${{ secrets.CERTBOT_EMAIL }}"
             APP_DIR="/home/${{ vars.EC2_USER }}/cb-api-server/server"
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
@@ -76,7 +75,7 @@ jobs:
             echo "Writing environment variables to .env..."
             cat <<EOF > "$APP_DIR/.env.production"
             NODE_ENV=production
-            PORT=3000
+            PORT=443
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             CA_CERT_PATH=ca.crt
             SERVER_KEY_PATH=server.key
@@ -92,82 +91,20 @@ jobs:
             echo "Building the app..."
             npm run build
 
-            # --- NGINX SETUP ---
-            echo "--- Configuring Nginx ---"
-            if ! command -v nginx &> /dev/null; then
-              echo "Installing Nginx..."
-              sudo yum install -y nginx
-              sudo systemctl enable nginx
-            fi
+            # Allow Node.js to bind to port 443
+            echo "Setting setcap for Node.js..."
+            NODE_PATH=$(which node)
+            sudo setcap 'cap_net_bind_service=+ep' "$NODE_PATH"
 
-            echo "Configuring 'server_names_hash_bucket_size'..."
-            if ! grep -q "server_names_hash_bucket_size" /etc/nginx/nginx.conf; then
-              sudo sed -i '/http {/a \    server_names_hash_bucket_size 128;' /etc/nginx/nginx.conf
-            else
-              sudo sed -i 's/^\(\s*\)#\?\s*server_names_hash_bucket_size.*/\1server_names_hash_bucket_size 128;/' /etc/nginx/nginx.conf
-            fi
-
-            NGINX_CONF="/etc/nginx/conf.d/cb-api.conf"
-            WEB_DOMAIN="${{ vars.WEB_DOMAIN }}"
-            API_DOMAIN="${{ vars.API_DOMAIN }}"
-            echo "Creating Nginx config file: $NGINX_CONF"
-            sudo tee "$NGINX_CONF" > /dev/null <<EOF
-            server {
-                listen 80;
-                listen [::]:80;
-                server_name $API_DOMAIN;
-
-                # Proxy API requests to Node.js backend
-                location / {
-                    proxy_pass http://localhost:3000;
-                    proxy_http_version 1.1;
-                    proxy_set_header Upgrade \$http_upgrade;
-                    proxy_set_header Connection "upgrade";
-                    proxy_set_header Host \$host;
-                    proxy_cache_bypass \$http_upgrade;
-                    proxy_set_header X-Real-IP \$remote_addr;
-                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto \$scheme;
-                }
-            }
-
-            server {
-                listen 80;
-                listen [::]:80;
-                server_name $WEB_DOMAIN;
-
-                root /var/www/frontend;
-                index index.html;
-
-                location / {
-                    try_files \$uri /index.html;
-                }
-            }
-            EOF
-
-            echo "Testing and restarting Nginx..."
-            sudo nginx -t && sudo systemctl restart nginx || { echo "Nginx configuration failed!"; exit 1; }
-
-            echo "Installing Certbot and requesting SSL certificate..."
-            if ! command -v certbot &> /dev/null; then
-              sudo yum install -y epel-release
-              sudo yum install -y certbot python3-certbot-nginx
-            fi
-
-            sudo certbot --nginx --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$API_DOMAIN" -d "$WEB_DOMAIN"
-
-            echo "Reloading Nginx with SSL..."
-            sudo nginx -t && sudo systemctl reload nginx
-
-            # Copy all files except src/, node_modules/, and dist
+            # Copy runtime files to dist/
             echo "Copying runtime files to dist/ ..."
             mkdir -p dist
             rsync -av --exclude='src' --exclude='node_modules' --exclude='dist' ./ dist/
 
-            # Start/restart commercial-bank-api with PM2
+            # Start/restart the app with PM2
             echo "Starting/Restarting commercial-bank-api with PM2..."
             cd dist
-            export NODE_ENV=production 
+            export NODE_ENV=production
             if pm2 show commercial-bank-api &> /dev/null; then
               pm2 restart commercial-bank-api
             else
