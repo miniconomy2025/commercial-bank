@@ -1,31 +1,39 @@
-import { useState } from 'react'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from 'react'; 
+import AggregationContent from './pages/Aggregation/Aggregation';
+import IndividualAccountContent from './pages/Accounts/Accounts';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [activeTab, setActiveTab] = useState('aggregation');
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <main className="app-container">
+      <header className="app-header">
+        <section className="header-section">
+          <h1 className="header-title">Banking Dashboard</h1>
+          <p className="header-subtitle">Overview of your banking operations and key metrics</p>
+        </section>
 
-export default App
+        <nav className="tab-nav">
+          <button
+            onClick={() => setActiveTab('aggregation')}
+            className={`tab-button ${activeTab === 'aggregation' ? 'active' : ''}`}
+          >
+            Aggregation
+          </button>
+          <button
+            onClick={() => setActiveTab('tab2')}
+            className={`tab-button ${activeTab === 'tab2' ? 'active' : ''}`}
+          >
+            Individual Account Statistics
+          </button>
+        </nav>
+      </header>
+
+      <section className="tab-content">
+        {activeTab === 'aggregation' && <AggregationContent />}
+        {activeTab === 'tab2' && <IndividualAccountContent />}
+      </section>
+    </main>
+  );
+}
