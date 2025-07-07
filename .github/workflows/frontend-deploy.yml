@@ -66,7 +66,7 @@ jobs:
                 listen 80;
                 server_name $WEB_DOMAIN;
 
-                root /var/www/frontend;
+                root /var/www/frontend/frontend/dist;
                 index index.html;
 
                 location / {
