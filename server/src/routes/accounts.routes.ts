@@ -6,8 +6,9 @@ import { snakeToCamelCaseMapper } from '../utils/mapper';
 
 const router = Router();
 
-router.get('/accounts', async (req: Request, res: Response) => {
+router.get('/account', async (req: Request,res: Response) => {
   try {
+    const teamId = req.account?.teamId || 'team_';
     res.status(200).json();
   } catch (error) {
     logger.error('Error fetching accounts:', error);
@@ -19,14 +20,14 @@ router.post('/accounts', async (req: Request, res: Response) => {
   try {
     const createdAt = getSimTime();
     const { notificationUrl } = snakeToCamelCaseMapper(req.body);
-    const teamId = req.teamId!;
+    const teamId = '83343477859235004937517011007803';
 
     if (!notificationUrl) {
       res.status(400).json({ error: 'Notification URL is required' });
       return;
     }
 
-    const newAccount: CreateAccountResult = await createAccount(createdAt, notificationUrl, teamId);
+    const newAccount: CreateAccountResult = await createAccount(createdAt, notificationUrl, teamId ?? '');
 
     if (newAccount.account_number === 'account exist') {
       logger.info(`Account already exists for team ID: ${teamId}`);

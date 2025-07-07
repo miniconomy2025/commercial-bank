@@ -21,6 +21,20 @@ export interface CreateAccountResult {
     account_number: string;
 }
 
+export interface AccountInformation {
+  account_number: string,
+  balance: number,
+  notificationUrl: string,
+  loans: Loan[]
+}
+
+export interface Loan {
+  totalAmount: number,
+  outstandingAmount: number,
+  startedAt: SimTime,
+  interest: number
+}
+
 export const createAccount = async (
     createdAt: number,
     notificationUrl: string,
@@ -37,4 +51,12 @@ export const createAccount = async (
         console.error('Error creating account:', error);
         throw error;
     }
+}
+
+export const getAccountInformation = async (teamId: string) => {
+  try {
+
+  } catch (error) {
+
+  }
 }
