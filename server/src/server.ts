@@ -10,7 +10,7 @@ const options = {
   key: fs.readFileSync('server.key'),
   cert: fs.readFileSync('server.crt'),
   ca: fs.readFileSync('ca.crt'),
-  requestCert: true,
+  requestCert: false,
   rejectUnauthorized: false
 };
 
