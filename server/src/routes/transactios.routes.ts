@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { logger } from '../utils/logger';
+import { getSimTime } from '../utils/time';
 
 const router = Router()
 
@@ -18,8 +19,10 @@ router.get("/transactions", async (req, res) => {
 });
 
 router.post("/transactions", async (req, res) => {
-    
-  const { to_account_number, amount, description } = req.body;
+
+  const createdAt = getSimTime();
+  const { to_account_number, to_bank_name, amount, description } = req.body;
+
   const from_account_number = req.account!.accountNumber;
   
   try {
@@ -27,7 +30,8 @@ router.post("/transactions", async (req, res) => {
         to_account_number,
         from_account_number,
         amount,
-        description
+        description,
+        createdAt
     );
     res.status(200).json(newTransaction);
   } catch (error) {

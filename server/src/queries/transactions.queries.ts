@@ -2,11 +2,22 @@ import db from "../config/db.config";
 import { getSimTime, SimTime } from "../utils/time";
 
 export const getAllTransactions = async (
-  from: string,
-  to: string,
+  fromAccountNumber: string,
+  toAccountNumber: string,
   onlySuccessful: boolean = false
 ): Promise<Transaction[]> => {
-  const parameters:(string | number)[] = [from, to];
+  const fromRef = await db.oneOrNone<{ id: number }>(
+    'SELECT id FROM account_refs WHERE account_number = $1',
+    [fromAccountNumber]
+  );
+
+  const toRef = await db.oneOrNone<{ id: number }>(
+    'SELECT id FROM account_refs WHERE account_number = $1',
+    [toAccountNumber]
+  );
+
+
+  const parameters: (string | number)[] = [fromRef!.id, toRef!.id];
   let query = 'SELECT * FROM transactions WHERE "from" = $1 AND "to" = $2';
 
   if (onlySuccessful) {

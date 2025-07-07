@@ -27,12 +27,12 @@ export const createAccount = async (
     teamId: string
 ): Promise<CreateAccountResult> => {
     try {
-        const result = await db.proc<CreateAccountResult>(
-            'create_account',
-            [createdAt, notificationUrl, teamId, null]
+        const result = await db.oneOrNone<{ create_account: string }>(
+          'SELECT create_account($1, $2, $3)',
+          [createdAt, notificationUrl, teamId]
         );
         
-        return result ? result : { account_number: "" };
+        return result ? { account_number: result.create_account } : { account_number: "" };
     } catch (error) {
         console.error('Error creating account:', error);
         throw error;

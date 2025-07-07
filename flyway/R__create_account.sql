@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE create_account(
+CREATE OR REPLACE FUNCTION create_account(
     created_at NUMERIC(9, 3),
     notification_url VARCHAR(255),
     team_id VARCHAR(32),
