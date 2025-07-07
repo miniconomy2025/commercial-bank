@@ -4,6 +4,7 @@ import { URL } from "url";
 import { Observable, throwError } from "rxjs";
 import { catchError, timeout } from "rxjs/operators";
 import appConfig from "../config/app.config";
+import { snakeToCamelCaseMapper } from "./mapper";
 
 interface HttpClientResponse<T = any> {
   statusCode?: number;
@@ -22,11 +23,10 @@ export class HttpClient {
     });
   }
 
-  public request<T = any>(options: {
+  private request<T = any>(options: {
     url: string;
     method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
     headers?: Record<string, string>;
-    query?: Record<string, string | number | boolean>;
     body?: any;
     timeoutMs?: number;
   }): Observable<HttpClientResponse<T>> {
@@ -34,22 +34,10 @@ export class HttpClient {
       url,
       method = "GET",
       headers = {},
-      query = {},
       body,
       timeoutMs = appConfig.timeout,
     } = options;
 
-    const parsedUrl = new URL(url);
-    const queryParams = new URLSearchParams();
-
-    Object.entries(query).forEach(([key, value]) => {
-      queryParams.append(key, String(value));
-    });
-
-    const queryString = queryParams.toString();
-    const fullPath = `${parsedUrl.pathname}${
-      queryString ? `?${queryString}` : ""
-    }`;
 
     const requestBody = body ? JSON.stringify(body) : undefined;
 
@@ -57,14 +45,16 @@ export class HttpClient {
       headers["Content-Type"] = "application/json";
       headers["Content-Length"] = Buffer.byteLength(requestBody!).toString();
     }
+    const urlObj = new URL(url);
 
     const httpsOptions: https.RequestOptions = {
-      hostname: parsedUrl.hostname,
-      port: parsedUrl.port || 443,
-      path: fullPath,
       method,
       headers,
       agent: this.httpsAgent,
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      protocol: urlObj.protocol,
+      port: urlObj.port || 443,
     };
 
     return new Observable<HttpClientResponse<T>>((subscriber) => {
@@ -132,7 +122,7 @@ export class HttpClient {
 
   private parseResponse<T>(data: string): T {
     try {
-      return JSON.parse(data) as T;
+      return snakeToCamelCaseMapper(JSON.parse(data)) as T;
     } catch {
       return data as any as T;
     }

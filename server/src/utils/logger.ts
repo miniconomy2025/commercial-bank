@@ -25,15 +25,15 @@ const log = (level: LogLevel, ...args: unknown[]) => {
       console.log(prefix, ...args);
       break;
     case 'warn':
-      console.warn(prefix, ...args);
+      console.log(prefix, ...args);
       break;
     case 'error':
-      console.error(prefix, ...args);
+      console.log(prefix, ...args);
       break;
     case 'success':
       console.log(`${prefix} \x1b[32m`, ...args, reset);
     case 'debug':
-      console.debug(prefix, ...args);
+      console.log(prefix, ...args);
       break;
   }
 };
