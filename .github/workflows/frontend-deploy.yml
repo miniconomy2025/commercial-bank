@@ -1,37 +1,31 @@
 name: Deploy Frontend
 
 on:
-  # push:
-  #   paths:
-  #     - "frontend/**"
   workflow_dispatch: {}
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js 18
-        uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install dependencies
+      - name: Install frontend dependencies and build
         run: |
           cd frontend
           npm ci
-
-      - name: Build frontend
-        run: |
-          cd frontend
           npm run build
 
       - name: Copy frontend build to EC2
         uses: appleboy/scp-action@v1
         with:
-          host: ${{ vars.EC2_HOST }}
+          host: ${{ vars.FRONTEND_EC2_HOST }}
           username: ${{ vars.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
@@ -39,16 +33,60 @@ jobs:
           target: "/home/${{ vars.EC2_USER }}/frontend-build/"
           rm: true
 
-      - name: Deploy static files on EC2
+      - name: Deploy and configure Nginx + Certbot
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.EC2_HOST }}
+          host: ${{ vars.FRONTEND_EC2_HOST }}
           username: ${{ vars.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
+            set -e
+
+            WEB_DOMAIN="${{ vars.WEB_DOMAIN }}"
+            CERTBOT_EMAIL="${{ secrets.CERTBOT_EMAIL }}"
+
+            echo "--- Deploying frontend files ---"
             sudo mkdir -p /var/www/frontend
             sudo rm -rf /var/www/frontend/*
-            sudo cp -r /home/${{ vars.EC2_USER }}/frontend-build/frontend/dist/* /var/www/frontend/
+            sudo cp -r /home/${{ vars.EC2_USER }}/frontend-build/* /var/www/frontend/
             sudo chown -R nginx:nginx /var/www/frontend || true
-            echo "Frontend static files deployed to /var/www/frontend."
+
+            echo "--- Installing and Configuring Nginx ---"
+            if ! command -v nginx &> /dev/null; then
+              sudo yum install -y nginx || sudo apt install -y nginx
+              sudo systemctl enable nginx
+            fi
+
+            NGINX_CONF="/etc/nginx/conf.d/frontend.conf"
+            echo "Creating Nginx config file at $NGINX_CONF"
+
+            sudo tee "$NGINX_CONF" > /dev/null <<EOF
+            server {
+                listen 80;
+                server_name $WEB_DOMAIN;
+
+                root /var/www/frontend;
+                index index.html;
+
+                location / {
+                    try_files \$uri /index.html;
+                }
+            }
+            EOF
+
+            echo "Testing and restarting Nginx..."
+            sudo nginx -t && sudo systemctl restart nginx
+
+            echo "--- Installing Certbot and requesting SSL certificate ---"
+            if ! command -v certbot &> /dev/null; then
+              sudo yum install -y epel-release || true
+              sudo yum install -y certbot python3-certbot-nginx || sudo apt install -y certbot python3-certbot-nginx
+            fi
+
+            sudo certbot --nginx --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$WEB_DOMAIN"
+
+            echo "Reloading Nginx with SSL..."
+            sudo nginx -t && sudo systemctl reload nginx
+
+            echo "Frontend deployed with HTTPS at https://$WEB_DOMAIN"
