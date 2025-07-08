@@ -38,3 +38,22 @@ export const createAccount = async (
         throw error;
     }
 }
+
+export const getAccountInformation = async (teamId: string) => {
+  try {
+    const accountInformation = await db.oneOrNone(
+      `SELECT 
+      SUM(CASE WHEN transactions."to" = accounts.id THEN transactions.amount ELSE 0 END) - 
+      SUM(CASE WHEN transactions."from" = accounts.id THEN transactions.amount ELSE 0 END) AS net_balance,
+      account_number
+      FROM accounts
+      INNER JOIN transactions ON (transactions."to" = accounts.id OR transactions."from" = accounts.id)
+      WHERE accounts.team_id = $1
+      GROUP BY accounts.id, accounts.account_number;`,
+      [teamId]
+    )
+    return accountInformation
+  } catch (error: any) {
+    return error.message
+  }
+}

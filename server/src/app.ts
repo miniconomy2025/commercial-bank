@@ -10,7 +10,7 @@ import SimulationRouter from './routes/simulation.routes';
 const app = express();
 app.use(express.json());
 
-app.use('/api', authMiddleware , accountsRouter);
+app.use('/api', authMiddleware, accountsRouter);
 app.use('/api', authMiddleware, transactionsRouter);
 app.use('/api', authMiddleware, loansRouter);
 app.use('/api', authMiddleware, SimulationRouter);
