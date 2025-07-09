@@ -16,11 +16,9 @@ router.get("/status", authMiddleware, (req, res) => {
     
     res.json({ status: "ok", message: "mTLS endpoint is working!" });
     httpClient
-      .request({
-        url: "https://localhost:8443/status",
-        method: "GET",
-        query: { name: "Indie", verbose: true },
-      })
+      .get(
+        "https://localhost:8443/status"
+      )
       .subscribe({
         next: (response: any) => logger.info("Data:", response.data),
         error: (err: any) => logger.error(err.message),
