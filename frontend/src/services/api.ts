@@ -1,4 +1,4 @@
-const BASE_URL = 'https://localhost:3000/api';
+const BASE_URL = 'https://commercial-bank-api.projects.bbdgrad.com/api';
 
 export async function apiGet<T>(endpoint: string): Promise<T> {
   try {
