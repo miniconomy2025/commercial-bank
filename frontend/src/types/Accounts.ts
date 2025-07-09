@@ -2,6 +2,10 @@ export type Account =  {
   id: string;
   name: string;
   color: string;
+  balance:string
+  income:string
+  expenses:string
+  loanBalance:string
 }
 
 export type AccountFilterProps = {
