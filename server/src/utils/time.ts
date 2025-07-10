@@ -8,7 +8,7 @@ const httpClient = new HttpClient();
 const REAL_MS_PER_SIM_DAY = 2 * 60 * 1000;
 const SIM_MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-let simulationStartTime: number = Date.UTC(2050, 0, 1);
+let simulationStartTime: number = Date.UTC(0, 0, 0);
 let realStartTime : number = Date.now();
 let syncIntervalId: ReturnType<typeof setInterval> | null = null;
 
