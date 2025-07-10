@@ -5,12 +5,15 @@ import { NextFunction, Request, Response } from 'express';
 import { TLSSocket } from 'tls';
 import { Socket } from 'net';
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    account?: Account;
-    teamId?: string;
+declare global {
+  namespace Express {
+    interface Request {
+      account?: Account;
+      teamId?: string;
+    }
   }
 }
+
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
 

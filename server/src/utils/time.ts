@@ -16,13 +16,14 @@ let syncIntervalId: ReturnType<typeof setInterval> | null = null;
  * Initialize the simulation.
  * @param simStartTime - start of simulation in epoch ms
  */
-export function initSimulation(simStartTime: number) {
+export function initSimulation(simStartTime: number, onEachDay?: (simTime: SimTime) => void) {
   simulationStartTime = simStartTime;
   realStartTime = Date.now();
 
   if (syncIntervalId) clearInterval(syncIntervalId);
   syncIntervalId = setInterval(() => {
     syncSimulationTime();
+    onEachDay?.(getSimTime());
   }, REAL_MS_PER_SIM_DAY);
 }
 

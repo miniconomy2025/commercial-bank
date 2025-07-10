@@ -90,15 +90,12 @@ router.post('/account/me/notify', async (req: Request, res: Response) => {
     const { notification_url } = req.body;
     const teamId = req.account?.teamId;
 
-    if (!notification_url) {
-      return res.status(400).json({ error: 'notification_url is required' });
+    if (!notification_url)  { res.status(400).json({ error: 'notification_url is required' }); }
+    else if (!teamId)       { res.status(403).json({ error: 'Not authenticated' }); }
+    else {
+      await updateAccountNotificationUrl(teamId, notification_url);
+      res.status(200).json({ message: 'Notification URL updated' });
     }
-    if (!teamId) {
-      return res.status(403).json({ error: 'Not authenticated' });
-    }
-
-    await updateAccountNotificationUrl(teamId, notification_url);
-    res.status(200).json({ message: 'Notification URL updated' });
   } catch (error) {
     logger.error('Error updating notification URL:', error);
     res.status(500).json({ error: 'Internal Server Error' });
