@@ -16,6 +16,10 @@ jobs:
         with:
           node-version: 18
 
+      - name: Write server.key from secret
+        run: |
+          echo "VITE_CLIENT_ID=${{ secrets.CLIENT_ID }}\n" > ./frontend/.env.production
+
       - name: Install frontend dependencies and build
         run: |
           cd frontend
@@ -32,7 +36,7 @@ jobs:
           source: "frontend/dist/"
           target: "/home/${{ vars.EC2_USER }}/frontend-build/"
           rm: true
-      
+
       - name: create certs directory
         run: mkdir -p ./certs
 
