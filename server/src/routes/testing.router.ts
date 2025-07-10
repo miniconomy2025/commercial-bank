@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { response, Router } from "express";
 import appConfig from "../config/app.config";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { HttpClient } from "../utils/http-client";
@@ -7,26 +7,26 @@ import { logger } from "../utils/logger";
 const router = Router();
 const httpClient = new HttpClient();
 
-router.get("/status", authMiddleware, (req, res) => {
-  if (appConfig.isDev) {
-    const { name, verbose } = req.query;
-    if (verbose) {
-      logger.info("Received GET request with query parameters:", { name, verbose });
+router.get("/status-sumsang-phone", authMiddleware, (req, res) => {
+  httpClient.get("https://retail-bank-api.projects.bbdgrad.com/accounts").subscribe({
+    next: (response) => {
+      res.json({ status: "ok", message: response});
+    },
+    error: (error) => {
+      res.status(500).json({ status: "error", response });
     }
-  }
+  });
 });
 
-router.post("/status", authMiddleware, (req, res) => {
-    if (appConfig.isDev) {
-        logger.info("Received POST request with body:", req.body);
-        res.json({ status: "ok", message: "mTLS POST endpoint is working!" });
+router.get("/status-retail-bank", authMiddleware, (req, res) => {
+  httpClient.get("https://sumsang-phones-api.projects.bbdgrad.com/public-api/stock").subscribe({
+    next: (response) => {
+      res.json({ status: "ok", message: response});
+    },
+    error: (error) => {
+      res.status(500).json({ status: "error", response });
     }
-});
-
-router.get("/status-unauthed", (req, res) => {
-  if (appConfig.isDev) {
-    res.json({ status: "ok", message: "dashboard endpoint is working!" });
-  }
+  });
 });
 
 export default router;
