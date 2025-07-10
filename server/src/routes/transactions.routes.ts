@@ -30,9 +30,7 @@ router.post("/transactions", async (req, res) => {
         to_account_number,
         from_account_number,
         amount,
-        description,
-        to_bank_name,
-        createdAt
+        description
     );
     res.status(200).json(newTransaction);
   } catch (error) {
