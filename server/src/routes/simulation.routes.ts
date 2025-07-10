@@ -4,7 +4,6 @@ import { endSimulation, getDateTimeAsISOString, initSimulation } from "../utils/
 import { createTransaction } from "../queries/transactions.queries";
 import { getAccountFromOrganizationUnit } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
-import appConfig from "../config/app.config";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 
 const router = Router();
