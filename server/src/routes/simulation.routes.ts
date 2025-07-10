@@ -4,9 +4,24 @@ import { endSimulation, getDateTimeAsISOString, initSimulation } from "../utils/
 import { createTransaction } from "../queries/transactions.queries";
 import { getAccountFromOrganizationUnit } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
+import { attemptInstalments } from "../queries/loans.queries";
+
+import appConfig from "../config/app.config";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 
 const router = Router();
+
+function onEachDay() {
+    attemptInstalments();
+}
+
+router.use((req, res, next) => {
+    if (req.teamId !== appConfig.thohTeamId) {
+        res.status(403).json({ error: "Forbidden: Only THOH can access this endpoint" });
+        return;
+    }
+    next();
+});
 
 router.post("/start", async (req, res) => {
     const { startingTime, startingBalance, fromAccountNumber } = snakeToCamelCaseMapper(req.body);
@@ -15,7 +30,7 @@ router.post("/start", async (req, res) => {
             res.status(400).json({ error: "Bad Request: Missing required fields: starting_time, starting_balance, from_account_number" });
             return;
         }
-        initSimulation(startingTime + 10); // Offset by 10ms to account for minor network/request latency
+        initSimulation(startingTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
         const toAccountNumber = await getAccountFromOrganizationUnit('commercial-bank').then(account => account?.accountNumber);
         if (!toAccountNumber) {
             res.status(404).json({ error: "Commercial bank account not found" });
