@@ -15,14 +15,6 @@ function onEachDay() {
     attemptInstalments();
 }
 
-router.use((req, res, next) => {
-    if (req.teamId !== appConfig.thohTeamId) {
-        res.status(403).json({ error: "Forbidden: Only THOH can access this endpoint" });
-        return;
-    }
-    next();
-});
-
 router.post("/start", async (req, res) => {
     const { startingTime, startingBalance, fromAccountNumber } = snakeToCamelCaseMapper(req.body);
     try {
