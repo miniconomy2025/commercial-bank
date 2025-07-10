@@ -31,6 +31,7 @@ router.post("/transactions", async (req, res) => {
         from_account_number,
         amount,
         description,
+        to_bank_name,
         createdAt
     );
     res.status(200).json(newTransaction);

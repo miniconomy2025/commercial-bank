@@ -1,5 +1,5 @@
 import express from 'express';
-import transactionsRouter from './routes/transactios.routes';
+import transactionsRouter from './routes/transactions.routes';
 import accountsRouter from './routes/accounts.router';
 import TestingRouter from './routes/testing.router';
 import loansRouter from './routes/loans.routes';
@@ -22,7 +22,7 @@ app.use(cors({
 
 HttpClient
 
-app.use('/api', authMiddleware , accountsRouter);
+app.use('/api', authMiddleware, accountsRouter);
 app.use('/api', authMiddleware, transactionsRouter);
 app.use('/api', authMiddleware, loansRouter);
 app.use('/api', authMiddleware, SimulationRouter);

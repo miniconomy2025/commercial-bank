@@ -15,7 +15,6 @@ router.get("/status-sumsang-phone", authMiddleware, (req, res) => {
     error: (error) => {
       res.status(500).json({ status: "error", response });
     }
-  });
 });
 
 router.get("/status-retail-bank", authMiddleware, (req, res) => {

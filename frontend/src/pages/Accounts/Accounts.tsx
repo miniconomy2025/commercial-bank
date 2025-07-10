@@ -1,27 +1,48 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import RecentTransactions from '../../components/Transactions/Transactions';
 import AccountSelector from '../../components/AccountSelector/AccountSelector';
 import PieChart from '../../components/PieChart/PieChart';
 import './Accounts.css';
-
-const accounts = [
-  { id: '1', name: 'Main Account', color: '#3b82f6' },
-  { id: '2', name: 'Savings Account', color: '#10b981' },
-  { id: '3', name: 'Investment Account', color: '#f59e0b' },
-  { id: '4', name: 'Emergency Fund', color: '#8b5cf6' }
-];
-
-const transactions = [
-  { id: 1, company: 'Apple Store', type: 'Purchase', amount: '+R2,500', status: 'Completed', icon: '🍎', iconBg: '#f3f4f6' },
-  { id: 2, company: 'Netflix', type: 'Subscription', amount: '-R199', status: 'Completed', icon: '📺', iconBg: '#fef3c7' },
-  { id: 3, company: 'Uber', type: 'Transport', amount: '-R85', status: 'Pending', icon: '🚗', iconBg: '#dbeafe' },
-  { id: 4, company: 'Woolworths', type: 'Groceries', amount: '-R450', status: 'Completed', icon: '🛒', iconBg: '#dcfce7' },
-  { id: 5, company: 'Salary', type: 'Income', amount: '+R15,000', status: 'Completed', icon: '💰', iconBg: '#f0fdf4' }
-];
+import { apiGet } from '../../services/api';
+import type { Account } from '../../types/Accounts';
 
 const IndividualAccountContent = () => {
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(['1']);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
+
   const selectedAccount = accounts.find(acc => selectedAccounts.includes(acc.id)) || accounts[0];
+
+  // First, fetch accounts
+  useEffect(() => {
+    setIsLoading(true);
+    apiGet<Account[]>('/dashboard/accounts')
+      .then((fetchedAccounts) => {
+        setAccounts(fetchedAccounts);
+        // Initialize with only the first account selected
+        if (fetchedAccounts.length > 0) {
+          setSelectedAccounts([fetchedAccounts[0].id]);
+        }
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  // Fetch transactions when selected account changes
+  useEffect(() => {
+    if (!selectedAccount) return;
+
+    setIsTransactionsLoading(true);
+    apiGet<any[]>(`/dashboard/transactions?account=${selectedAccount.name}`)
+      .then((fetchedTransactions) => {
+        setTransactions(fetchedTransactions);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setIsTransactionsLoading(false));
+  }, [selectedAccount]);
 
   const expenseData = [
     { label: 'Office Supplies', value: 2500, color: '#3b82f6' },
@@ -30,12 +51,49 @@ const IndividualAccountContent = () => {
     { label: 'Services', value: 2000, color: '#8b5cf6' }
   ];
 
-  const accountStats = {
-    balance: 'R1,000,000',
-    loansOutstanding: 'R10,000',
-    totalMoneyIn: 'R125,000',
-    totalMoneyOut: 'R15,000'
-  };
+  // Show loading state
+  if (isLoading) {
+    return (
+      <main className="account-content">
+        <div className="loading-container">
+          <p>Loading accounts...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <main className="account-content">
+        <div className="error-container">
+          <p>Error: {error}</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Show empty state if no accounts
+  if (accounts.length === 0) {
+    return (
+      <main className="account-content">
+        <div className="empty-state">
+          <p>No accounts found</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Show loading if no selected account yet
+  if (!selectedAccount) {
+    return (
+      <main className="account-content">
+        <div className="loading-container">
+          <p>Loading account data...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="account-content">
@@ -49,29 +107,33 @@ const IndividualAccountContent = () => {
         <div className="account-left">
           <article className="account-card">
             <h2 className="account-title">
-              <span
-                className="account-dot"
-                style={{ backgroundColor: selectedAccount.color }}
-              />
               {selectedAccount.name}
             </h2>
 
             <div className="account-metrics">
               <div>
                 <h3 className="metric-label">Balance</h3>
-                <p className="metric-value text-dark">{accountStats.balance}</p>
+                <p className="metric-value text-dark">
+                  {selectedAccount.balance || '0'}
+                </p>
               </div>
               <div>
                 <h3 className="metric-label">Loans Outstanding</h3>
-                <p className="metric-value text-danger">{accountStats.loansOutstanding}</p>
+                <p className="metric-value text-danger">
+                  {selectedAccount.loanBalance || '0'}
+                </p>
               </div>
               <div>
                 <h3 className="metric-label">Total Money In</h3>
-                <p className="metric-value text-success">{accountStats.totalMoneyIn}</p>
+                <p className="metric-value text-success">
+                  {selectedAccount.income || '0'}
+                </p>
               </div>
               <div>
                 <h3 className="metric-label">Total Money Out</h3>
-                <p className="metric-value text-danger">{accountStats.totalMoneyOut}</p>
+                <p className="metric-value text-danger">
+                  {selectedAccount.expenses || '0'}
+                </p>
               </div>
             </div>
 
@@ -82,7 +144,13 @@ const IndividualAccountContent = () => {
         </div>
 
         <aside className="account-right">
-          <RecentTransactions transactions={transactions} />
+          {isTransactionsLoading ? (
+            <div className="loading-container">
+              <p>Loading transactions...</p>
+            </div>
+          ) : (
+            <RecentTransactions transactions={transactions} />
+          )}
         </aside>
       </section>
     </main>

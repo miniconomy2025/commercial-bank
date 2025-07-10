@@ -4,74 +4,8 @@ import Chart from '../../components/LineChart/LineChart';
 import RecentTransactions from '../../components/Transactions/Transactions';
 import './Aggregation.css';
 import type { Account } from '../../types/Accounts';
+import type { Transaction } from '../../types/Transaction';
 import { apiGet } from '../../services/api';
-
-// const accounts = [
-//   { id: 'A', name: 'Account A', color: '#10b981' },
-//   { id: 'B', name: 'Account B', color: '#dc2626' },
-//   { id: 'C', name: 'Account C', color: '#3b82f6' },
-//   { id: 'D', name: 'Account D', color: '#f59e0b' },
-//   { id: 'E', name: 'Account E', color: '#8b5cf6' },
-//   { id: 'F', name: 'Account F', color: '#06b6d4' }
-// ];
-
-const transactions = [
-  {
-    id: 1,
-    company: 'Johnson & Associates LLC',
-    type: 'Wire Transfer',
-    date: '2024-01-15',
-    txnId: 'TXN001',
-    amount: '+R125,000',
-    status: 'Failed',
-    icon: '🏢',
-    iconBg: '#dbeafe'
-  },
-  {
-    id: 2,
-    company: 'Sarah Mitchell',
-    type: 'Loan Payment',
-    date: '2024-01-15',
-    txnId: 'TXN002',
-    amount: '+R2,500',
-    status: 'Completed',
-    icon: '👤',
-    iconBg: '#f3e8ff'
-  },
-  {
-    id: 3,
-    company: 'Tech Solutions Inc',
-    type: 'Business Deposit',
-    date: '2024-01-14',
-    txnId: 'TXN003',
-    amount: '+R45,000',
-    status: 'Pending',
-    icon: '🏢',
-    iconBg: '#dbeafe'
-  },
-  {
-    id: 4,
-    company: 'Michael Chen',
-    type: 'Mortgage Payment',
-    date: '2024-01-14',
-    txnId: 'TXN004',
-    amount: '+R3,200',
-    status: 'Completed',
-    icon: '👤',
-    iconBg: '#f3e8ff'
-  },
-  {
-    id: 5,
-    company: 'Global Industries Ltd',
-    type: 'International Transfer',
-    date: '2024-01-13',
-    txnId: 'TXN005',
-    amount: '+R89,500',
-    status: 'Completed',
-    icon: '🏢',
-    iconBg: '#dbeafe'
-  }
-];
 
 const generatePoints = (index: number, varianceBase: number, yOffset: number): number[] => {
   const points: number[] = [];
@@ -85,13 +19,23 @@ const generatePoints = (index: number, varianceBase: number, yOffset: number): n
 };
 
 const AggregationContent = () => {
-  const [selectedAccounts, setSelectedAccounts] = useState(['A', 'B', 'C', 'D', 'E', 'F']);
-   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<any>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<Account[]>('/dashboard/accounts')
-      .then(setAccounts)
+      .then((fetchedAccounts) => {
+        setAccounts(fetchedAccounts);
+        setSelectedAccounts(fetchedAccounts.map(acc => acc.id)); // Select all fetched accounts by default
+      })
+      .catch((err) => setError(err.message));
+      
+    apiGet<any[]>('/dashboard/transactions')
+      .then((fetchedTransactions) => {
+        setTransactions(fetchedTransactions);
+      })
       .catch((err) => setError(err.message));
   }, []);
 

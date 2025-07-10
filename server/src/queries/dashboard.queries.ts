@@ -1,26 +1,27 @@
 import db from "../config/db.config";
 
 
-export const getAllExistingTransactions = async (account: number | undefined): Promise<Transaction[]> => {
+export const getAllExistingTransactions = async (account: string | undefined): Promise<Transaction[]> => {
   const baseQuery = `
     SELECT 
-      ts.name as status,
+      t.transaction_number as transaction_number,
+      ts.name AS status,
       t.amount,
       t.description,
-      from_bank.name as from,
-      to_bank.name as to
+      from_acc.team_id AS from,
+      to_acc.team_id AS to
     FROM transactions t
     JOIN transaction_statuses ts ON t.status_id = ts.id
     JOIN account_refs from_ref ON t."from" = from_ref.id
+    JOIN accounts from_acc ON from_ref.account_number = from_acc.account_number
     JOIN account_refs to_ref ON t."to" = to_ref.id
-    JOIN banks from_bank ON from_ref.bank_id = from_bank.id
-    JOIN banks to_bank ON to_ref.bank_id = to_bank.id
+    JOIN accounts to_acc ON to_ref.account_number = to_acc.account_number
   `;
 
   if (account) {
     return await db.many(`
       ${baseQuery}
-      WHERE t."from" = $1 OR t."to" = $1
+      WHERE from_acc.team_id = $1 OR to_acc.team_id = $1
     `, [account]);
   } else {
     return await db.many(baseQuery);
@@ -58,7 +59,7 @@ export const getAllExistingAccounts = async (): Promise<Accounts[]> => {
         GROUP BY t."from"
       ) outgoing ON ar.id = outgoing.account_ref_id
     ) account_totals ON a.account_number = account_totals.account_number
-    WHERE a.closed_at IS NULL
+    WHERE a.closed_at IS NULL AND a.team_id NOT LIKE 'commercial-bank'
   `);
 };
 
@@ -74,15 +75,39 @@ export const getAllAccountExpenses = async (accountId: number): Promise<Expenses
   `, [accountId]);
 };
 
+interface LoanBalance {
+  loan_balance: number;
+}
+
+export const getLoanBalances = async (accountId: number): Promise<LoanBalance> => {
+  const result = await db.oneOrNone(`
+    SELECT 
+      COALESCE(SUM(initial_t.amount - COALESCE(payments.total_payments, 0)), 0) as loan_balance
+    FROM loans l
+    JOIN transactions initial_t ON l.initial_transaction_id = initial_t.id
+    JOIN account_refs ar ON initial_t."to" = ar.id
+    JOIN accounts a ON ar.account_number = a.account_number
+    LEFT JOIN (
+      SELECT 
+        lp.loan_id,
+        SUM(payment_t.amount) as total_payments
+      FROM loan_payments lp
+      JOIN transactions payment_t ON lp.transaction_id = payment_t.id
+      GROUP BY lp.loan_id
+    ) payments ON l.id = payments.loan_id
+    WHERE a.id = $1 AND l.write_off = false
+  `, [accountId]);
+  return result ?? { total_outstanding_balance: 0 };
+};
+
 export type Transaction = {
+    transaction_number:string;
     status:string;
     amount:number;
     description:string;
     from:string;
     to:string;
 };
-
-
 
 export type loan = {
     status:string;
