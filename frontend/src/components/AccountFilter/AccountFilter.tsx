@@ -24,10 +24,7 @@ const AccountFilter: React.FC<AccountFilterProps> = ({ selectedAccounts, handleA
               cursor: 'pointer'
             }}
           />
-          <span
-            className="account-color-dot"
-            style={{ backgroundColor: account.color }}
-          ></span>
+
           {account.name}
         </label>
       ))}

@@ -11,15 +11,10 @@ interface TransactionItemProps {
 const TransactionItem: React.FC<TransactionItemProps> = ({ transaction }) => (
   <article className="transaction-item">
     <div className="transaction-left">
-      <div
-        className="transaction-icon"
-        style={{ backgroundColor: transaction.iconBg }}
-      >
-        {transaction.icon}
-      </div>
       <div className="transaction-info">
-        <h4 className="transaction-company">{transaction.company}</h4>
-        <p className="transaction-type">{transaction.type}</p>
+        <h4 className="transaction-company">{transaction.to}</h4>
+        <p className="transaction-type">{transaction.from}</p>
+        <p className="transaction-type">{transaction.description}{transaction.date}</p>
       </div>
     </div>
 
@@ -29,17 +24,14 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction }) => (
         className="transaction-status"
         style={{
           color:
-            transaction.status === 'Completed'
+            transaction.status === 'success'
               ? '#16a34a'
-              : transaction.status === 'Failed'
-              ? '#dc2626'
-              : '#f59e0b',
+              : '#dc2626',
           backgroundColor:
-            transaction.status === 'Completed'
+            transaction.status === 'success'
               ? '#dcfce7'
-              : transaction.status === 'Failed'
-              ? '#fca5a5'
-              : '#fef3c7'
+              :'#fca5a5'
+             
         }}
       >
         {transaction.status}

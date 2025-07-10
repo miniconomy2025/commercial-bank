@@ -1,9 +1,12 @@
 export interface Transaction {
-id?:string | number
-  icon?: React.ReactNode;
-  iconBg?: string;
-  company?: string;
-  type?: string;
-  amount?: string | number;
-  status?: 'Completed' | 'Failed' | 'Pending' | string;
-}
+
+  transaction_number: string;
+  from: string;
+  to: string;
+  amount: number;
+  description: string;
+  status: string;
+  date: SimTime
+};
+
+export type SimTime = number;
