@@ -12,12 +12,6 @@ declare module 'express-serve-static-core' {
   }
 }
 
-const bypassCheckRoutes = [
-  { method: 'POST', path: '/accounts' },
-  { method: 'POST', path: '/simulation/start' },
-  { method: 'GET', path: '/dashboard/accounts' },
-];
-
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
 
   let cert;
@@ -36,21 +30,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       res.status(403).json({ error: 'Organization unit is required in the certificate' });
       return;
     }
-    
-    const shouldBypassCheck = bypassCheckRoutes.some(
-      (route) => route.method === req.method && route.path === req.path
-    );
-
-    if (!shouldBypassCheck) {
-      const account = await getAccountFromOrganizationUnit(organizationUnit);
-      if (!account) {
-        res.status(403).json({ error: 'No account found for the provided organization unit' });
-        return;
-      }
-      req.account = account;
-    } else {
-      req.teamId= organizationUnit;
-    }
+    req.teamId= organizationUnit;
     
     next();
   } catch (error) {
@@ -59,5 +39,22 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       error: 'Certificate processing failed',
       details: (error as Error).message 
     });
+  }
+}
+
+export async function accountMiddleware(req: Request, res: Response, next: NextFunction) {
+  try {
+    const teamId = req.teamId;
+    const account = await getAccountFromOrganizationUnit(teamId!);
+    if (!account) {
+      res.status(404).json({ error: 'Account not found for the given organization unit' });
+      return;
+    }
+
+    req.account = account;
+    next();
+  } catch (error) {
+    logger.error('Error fetching account:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 }
