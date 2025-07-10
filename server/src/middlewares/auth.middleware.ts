@@ -4,6 +4,7 @@ import { getAccountFromOrganizationUnit } from '../queries/auth.queries';
 import { NextFunction, Request, Response } from 'express';
 import { TLSSocket } from 'tls';
 import { Socket } from 'net';
+import appConfig from '../config/app.config';
 
 declare global {
   namespace Express {
@@ -15,7 +16,7 @@ declare global {
 }
 
 
-export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export function authMiddleware(req: Request, res: Response, next: NextFunction) {
 
   let cert;
   const socket: Socket = req.socket;
@@ -60,4 +61,27 @@ export async function accountMiddleware(req: Request, res: Response, next: NextF
     logger.error('Error fetching account:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
+}
+
+export function simulationMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (req.teamId !== appConfig.thohTeamId) {
+    res.status(403).json({ error: "Forbidden: Only THOH can access this endpoint" });
+    return;
+  }
+
+  next();
+}
+
+export function dashboardMiddleware(req: Request, res: Response, next: NextFunction) {
+  const dashboardId = req.query.clientId;
+  if (!dashboardId) {
+    res.status(400).json({ error: 'Dashboard ID is required' });
+    return;
+  }
+  if (dashboardId !== appConfig.clientId) {
+    res.status(400).json({ error: 'Invalid dashboard ID' });
+    return;
+  }
+
+  next();
 }

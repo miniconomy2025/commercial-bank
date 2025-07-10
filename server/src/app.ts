@@ -3,8 +3,8 @@ import transactionsRouter from './routes/transactions.routes';
 import accountsRouter from './routes/accounts.router';
 import TestingRouter from './routes/testing.router';
 import loansRouter from './routes/loans.routes';
-import { authMiddleware } from './middlewares/auth.middleware';
-import SimulationRouter from './routes/thoh.routes';
+import { accountMiddleware, authMiddleware, dashboardMiddleware, simulationMiddleware } from './middlewares/auth.middleware';
+import SimulationRouter from './routes/simulation.routes';
 import DashboardRouter from './routes/dashboard.routes'
 import cors from 'cors';
 
@@ -18,11 +18,11 @@ app.use(cors({
 }));
 
 
-app.use('/api', authMiddleware, accountsRouter);
-app.use('/api', authMiddleware, transactionsRouter);
-app.use('/api', authMiddleware, loansRouter);
-app.use('/api', authMiddleware, SimulationRouter);
-app.use('/api/dashboard', DashboardRouter);
+app.use('/api/account', authMiddleware, accountsRouter);
+app.use('/api/transactions', authMiddleware, accountMiddleware, transactionsRouter);
+app.use('/api/loan', authMiddleware, accountMiddleware, loansRouter);
+app.use('/api/simulation', authMiddleware, simulationMiddleware,SimulationRouter);
+app.use('/api/dashboard', dashboardMiddleware, DashboardRouter);
 app.use('/testing', TestingRouter);
 
 

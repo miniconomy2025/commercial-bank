@@ -6,7 +6,7 @@ import { snakeToCamelCaseMapper } from '../utils/mapper';
 
 const router = Router();
 
-router.get('/account', async (req: Request,res: Response) => {
+router.get('/', async (req: Request,res: Response) => {
   try {
     const teamId = req.teamId;
     const accountInformation = await getAccountInformation(teamId!);
@@ -23,7 +23,7 @@ router.get('/account', async (req: Request,res: Response) => {
 });
 
 
-router.post('/account', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
 
     const createdAt = getSimTime();
