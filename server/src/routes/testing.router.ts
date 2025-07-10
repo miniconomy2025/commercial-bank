@@ -24,7 +24,7 @@ router.get("/status-retail-bank", authMiddleware, (req, res) => {
       res.json({ status: "ok", message: response});
     },
     error: (error) => {
-      res.status(500).json({ status: "error", response });
+      res.status(500).json({ status: "error", error });
     }
   });
 });
