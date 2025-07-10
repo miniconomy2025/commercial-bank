@@ -8,6 +8,9 @@ import appConfig from './config/app.config';
 import SimulationRouter from './routes/simulation.routes';
 import DashboardRouter from './routes/dashboard.routes'
 import cors from 'cors';
+import { HttpClient } from './utils/http-client';
+
+const httpClient = new HttpClient();
 
 const app = express();
 app.use(express.json());
@@ -18,6 +21,14 @@ app.use(cors({
   credentials: true
 }));
 
+httpClient.get('retail-bank-api.projects.bbdgrad.com/accounts').subscribe({
+  next: (response) => {
+    console.log('Accounts fetched successfully:', response);
+  },
+  error: (error) => {
+    console.error('Error fetching accounts:', error);
+  }
+});
 
 app.use('/api', authMiddleware , accountsRouter);
 app.use('/api', authMiddleware, transactionsRouter);
