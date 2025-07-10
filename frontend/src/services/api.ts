@@ -2,7 +2,7 @@ const BASE_URL = 'https://commercial-bank.projects.bbdgrad.com/api';
 
 export async function apiGet<T>(endpoint: string): Promise<T> {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}?${import.meta.env.VITE_CLIENT_ID}`, {
+    const response = await fetch(`${BASE_URL}${endpoint}?clientId=${import.meta.env.VITE_CLIENT_ID}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
