@@ -54,7 +54,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: "certs/*"
-          target: "/etc/nginx/certs/"
+          target: "~/certs/"
           rm: true
 
       - name: Deploy and configure Nginx + Certbot
