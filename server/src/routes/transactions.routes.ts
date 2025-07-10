@@ -11,7 +11,7 @@ const banks = {
   hand: 'THOH'
 }
 
-router.get("/transactions", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const from = req.account!.accountNumber;
     const to = (req.query.to as string);
@@ -24,7 +24,7 @@ router.get("/transactions", async (req, res) => {
   }
 });
 
-router.post("/transactions", async (req, res) => {
+router.post("/", async (req, res) => {
 
   const { to_account_number, to_bank_name, amount, description } = req.body;
   const from_account_number = req.account!.accountNumber;
@@ -64,7 +64,7 @@ router.post("/transactions", async (req, res) => {
   }
 });
 
-router.get("/transactions/:id", async (req, res) => {
+router.get("/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
