@@ -22,7 +22,7 @@ router.get('/account', async (req: Request,res: Response) => {
   }
 });
 
-router.post('/accounts', async (req: Request, res: Response) => {
+router.post('/account', async (req: Request, res: Response) => {
   try {
 
     const createdAt = getSimTime();
