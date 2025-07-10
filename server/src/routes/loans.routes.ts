@@ -2,15 +2,17 @@ import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
 import { logger } from '../utils/logger';
-import { accountMiddleware } from '../middlewares/auth.middleware';
+import { snakeToCamelCaseMapper } from '../utils/mapper';
 
 const router = Router()
-
-router.use(accountMiddleware);
 // Take out a loan
 router.post("/", async (req, res) => {
-  const { amount } = req.body;
+  const { amount } = snakeToCamelCaseMapper(req.body);
   const borrowerAccNo = req.account!.accountNumber;
+  if (!amount || isNaN(amount) || amount <= 0) {
+    res.status(400).json({ error: "Invalid amount specified" });
+    return;
+  }
   try {
     const loanResult = await createLoan(borrowerAccNo, amount);
     res.status(200).json(loanResult);
@@ -41,7 +43,11 @@ router.get("/", async (req, res) => {
 // Repay loan
 // NOTE: Any account can contribute to the repayment of a loan on any other account
 router.post("/:loan_number/pay", async (req, res) => {
-  const { amount } = req.body;
+  const { amount } = snakeToCamelCaseMapper(req.body);
+  if (!amount || isNaN(amount) || amount <= 0) {
+    res.status(400).json({ error: "Invalid amount specified" });
+    return;
+  }
   const { loan_number } = req.params;
 
   const accNo = req.account!.accountNumber;
