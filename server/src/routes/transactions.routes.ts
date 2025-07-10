@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { logger } from '../utils/logger';
-import { accountMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router()
 
