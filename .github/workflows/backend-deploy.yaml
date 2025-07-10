@@ -81,6 +81,7 @@ jobs:
             SERVER_KEY_PATH=server.key
             SERVER_CERT_PATH=server.crt
             TIMEOUT=6000
+            CLIENT_ID=${{ secrets.CLIENT_ID }}
             EOF
 
             # Install app dependencies

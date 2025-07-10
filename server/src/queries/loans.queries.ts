@@ -38,7 +38,11 @@ export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>
 
 // TODO: Move to config
 export const MAX_LOANABLE_AMOUNT = 10000; // Max. amount an account can borrow in total across all loans
-export const LOAN_INTEREST_RATE = 0.01;   // Interest charged each day on the outstanding loan amount
+export let LOAN_INTEREST_RATE = 0.01;   // Interest charged each day on the outstanding loan amount
+
+export const setLoanInterestRate = (rate: number) => {
+  LOAN_INTEREST_RATE = rate;
+};
 
 export const createLoan = async (
   accountNumber: string,

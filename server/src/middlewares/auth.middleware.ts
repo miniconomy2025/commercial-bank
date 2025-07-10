@@ -1,6 +1,9 @@
 import { logger } from '../utils/logger';
 import { Account } from '../types/account.type';
 import { getAccountFromOrganizationUnit } from '../queries/auth.queries';
+import { NextFunction, Request, Response } from 'express';
+import { TLSSocket } from 'tls';
+import { Socket } from 'net';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -9,41 +12,25 @@ declare module 'express-serve-static-core' {
   }
 }
 
-const bypassCheckRoutes = [
-  { method: 'POST', path: '/accounts' },
-  { method: 'POST', path: '/simulation/start' },
-  { method: 'GET', path: '/dashboard/accounts' },
-];
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
 
-export async function authMiddleware(req: any, res: any, next: any){
-  //const cert = req.socket.getPeerCertificate();
+  let cert;
+  const socket: Socket = req.socket;
 
-  // if (!cert || !cert.raw) {
-  //   res.status(403).json({ error: 'Tls certificate is required' });
-  //   return;
-  // }
+  if(socket instanceof TLSSocket && socket.authorized) {
+    cert = socket.getPeerCertificate()
+  } else {
+    res.status(403).json({ error: 'Tls certificate is required' });
+    return;
+  };
 
   try {
-    // const organizationUnit = cert.subject.OU;
-    // if (!organizationUnit) {
-    //   res.status(403).json({ error: 'Organization unit is required in the certificate' });
-    //   return;
-    // }
-    
-    // const shouldBypassCheck = bypassCheckRoutes.some(
-    //   (route) => route.method === req.method && route.path === req.path
-    // );
-
-    // if (!shouldBypassCheck) {
-    //   const account = await getAccountFromOrganizationUnit(organizationUnit);
-    //   if (!account) {
-    //     res.status(403).json({ error: 'No account found for the provided organization unit' });
-    //     return;
-    //   }
-    //   req.account = account;
-    // } else {
-    //   req.teamId= organizationUnit;
-    // }
+    const organizationUnit = cert.subject.OU;
+    if (!organizationUnit) {
+      res.status(403).json({ error: 'Organization unit is required in the certificate' });
+      return;
+    }
+    req.teamId= organizationUnit;
     
     next();
   } catch (error) {
@@ -52,5 +39,22 @@ export async function authMiddleware(req: any, res: any, next: any){
       error: 'Certificate processing failed',
       details: (error as Error).message 
     });
+  }
+}
+
+export async function accountMiddleware(req: Request, res: Response, next: NextFunction) {
+  try {
+    const teamId = req.teamId;
+    const account = await getAccountFromOrganizationUnit(teamId!);
+    if (!account) {
+      res.status(404).json({ error: 'Account not found for the given organization unit' });
+      return;
+    }
+
+    req.account = account;
+    next();
+  } catch (error) {
+    logger.error('Error fetching account:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 }
