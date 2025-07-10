@@ -8,7 +8,7 @@ const router = Router();
 
 router.get('/account', async (req: Request,res: Response) => {
   try {
-    const teamId = req.account?.teamId;
+    const teamId = req.teamId;
     const accountInformation = await getAccountInformation(teamId!);
 
     if(accountInformation) {
@@ -27,7 +27,7 @@ router.post('/accounts', async (req: Request, res: Response) => {
 
     const createdAt = getSimTime();
     const { notificationUrl } = snakeToCamelCaseMapper(req.body);
-    const teamId = req.account?.teamId;
+    const teamId = req.teamId;
 
     if (!notificationUrl) {
       res.status(400).json({ error: 'Notification URL is required' });

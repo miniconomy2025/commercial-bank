@@ -49,4 +49,15 @@ router.get("/status-bulk-logistics", authMiddleware, (req, res) => {
   });
 });
 
+router.get("/status-consumer-logistics", authMiddleware, (req, res) => {
+  httpClient.get("https://consumer-logistics-api.projects.bbdgrad.com/health").subscribe({
+    next: (response) => {
+      res.json({ status: "ok", message: response});
+    },
+    error: (error) => {
+      res.status(500).json({ status: "error", error });
+    }
+  });
+});
+
 export default router;

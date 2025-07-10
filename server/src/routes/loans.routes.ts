@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
 import { logger } from '../utils/logger';
+import { accountMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router()
 
-
+router.use(accountMiddleware);
 // Take out a loan
 router.post("/loan", async (req, res) => {
   const { amount } = req.body;
@@ -75,7 +76,7 @@ router.get("/loan/:loan_number", async (req, res) => {
 //update the prime rate
 //NOTE: oly the hand can update this
 router.post("loan/prime_rate",async (req,res) =>{
-  const teamId = req.account?.teamId;
+  const teamId = req.teamId
   const {prime_rate} = req.body;
   if (teamId!=="thoh"){
     res.status(400).json("Only the hand can change the prime rate");
