@@ -100,11 +100,11 @@ jobs:
                 location /api/ {
                     proxy_pass https://commercial-bank-api.projects.bbdgrad.com;
 
-                    proxy_ssl_certificate /home/ec2-user/certs/client.crt;
-                    proxy_ssl_certificate_key /home/ec2-user/certs/client.key;
+                    proxy_ssl_certificate /home/ec2-user/certs/certs/client.crt;
+                    proxy_ssl_certificate_key /home/ec2-user/certs/certs/client.key;
 
                     proxy_ssl_verify on;
-                    proxy_ssl_trusted_certificate /home/ec2-user/certs/ca.crt;
+                    proxy_ssl_trusted_certificate /home/ec2-user/certs/certs/ca.crt;
                     proxy_ssl_verify_depth 2;
 
                     proxy_set_header Host \$host;
