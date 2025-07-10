@@ -1,11 +1,9 @@
 import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { logger } from '../utils/logger';
-import { getSimTime } from '../utils/time';
 import { accountMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router()
-router.use(accountMiddleware);
 
 router.get("/transactions", async (req, res) => {
   try {
@@ -26,7 +24,20 @@ router.post("/transactions", async (req, res) => {
   const { to_account_number, to_bank_name, amount, description } = req.body;
 
   const from_account_number = req.account!.accountNumber;
-  
+
+  // Check if interbank transfer is needed
+  if (to_bank_name !== "commercial-bank") {
+    switch (to_bank_name) {
+      case "thoh":
+        // TODO: Call THOH /interbank/transfer endpoint
+        break;
+      default:
+        logger.warn(`Interbank transfer to ${to_bank_name} is not implemented yet.`);
+        res.status(400).json({ error: `Interbank transfer to ${to_bank_name} is not supported.` });
+        return;
+    }
+  }
+
   try {
     const newTransaction = await createTransaction(
         to_account_number,
