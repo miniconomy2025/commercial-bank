@@ -5,6 +5,12 @@ import { accountMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router()
 
+const banks = {
+  commercial: 'commercial-bank',
+  retail: 'retail-bank',
+  hand: 'THOH'
+}
+
 router.get("/transactions", async (req, res) => {
   try {
     const from = req.account!.accountNumber;
@@ -20,9 +26,7 @@ router.get("/transactions", async (req, res) => {
 
 router.post("/transactions", async (req, res) => {
 
-  const createdAt = getSimTime();
   const { to_account_number, to_bank_name, amount, description } = req.body;
-
   const from_account_number = req.account!.accountNumber;
 
   // Check if interbank transfer is needed
@@ -39,6 +43,14 @@ router.post("/transactions", async (req, res) => {
   }
 
   try {
+
+    switch(to_bank_name.toLowerCase()) {
+    case banks.hand:
+      const interHand = await fetch(
+        `${process.env.THOH_HOST}/api/interbank`, 
+        { method: 'POST', body: JSON.stringify({ to_account_number, to_bank_name, amount, description, from_account_number }) })
+      res.status(200).json(interHand);
+  }
     const newTransaction = await createTransaction(
         to_account_number,
         from_account_number,
