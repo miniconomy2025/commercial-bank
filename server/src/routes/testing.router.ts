@@ -8,7 +8,7 @@ const router = Router();
 const httpClient = new HttpClient();
 
 router.get("/status-sumsang-phone", authMiddleware, (req, res) => {
-  httpClient.get("https://retail-bank-api.projects.bbdgrad.com/accounts").subscribe({
+  httpClient.get("https://sumsang-phones-api.projects.bbdgrad.com/public-api/stock").subscribe({
     next: (response) => {
       res.json({ status: "ok", message: response});
     },
@@ -19,12 +19,12 @@ router.get("/status-sumsang-phone", authMiddleware, (req, res) => {
 });
 
 router.get("/status-retail-bank", authMiddleware, (req, res) => {
-  httpClient.get("https://sumsang-phones-api.projects.bbdgrad.com/public-api/stock").subscribe({
+  httpClient.get("https://retail-bank-api.projects.bbdgrad.com/accounts").subscribe({
     next: (response) => {
       res.json({ status: "ok", message: response});
     },
     error: (error) => {
-      res.status(500).json({ status: "error", response });
+      res.status(500).json({ status: "error", error });
     }
   });
 });
