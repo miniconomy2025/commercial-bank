@@ -8,7 +8,6 @@ import appConfig from './config/app.config';
 import SimulationRouter from './routes/simulation.routes';
 import DashboardRouter from './routes/dashboard.routes'
 import cors from 'cors';
-import { HttpClient } from './utils/http-client';
 
 const app = express();
 app.use(express.json());
@@ -20,17 +19,12 @@ app.use(cors({
 }));
 
 
-HttpClient
-
 app.use('/api', authMiddleware, accountsRouter);
 app.use('/api', authMiddleware, transactionsRouter);
 app.use('/api', authMiddleware, loansRouter);
 app.use('/api', authMiddleware, SimulationRouter);
 app.use('/api/dashboard', DashboardRouter);
-
-if (appConfig.isDev) {
-  app.use('/testing', TestingRouter);
-}
+app.use('/testing', TestingRouter);
 
 
 export default app;
