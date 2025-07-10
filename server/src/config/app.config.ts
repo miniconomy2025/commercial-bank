@@ -25,6 +25,7 @@ const appConfig = {
   timeout: process.env.TIMEOUT ? Number(process.env.TIMEOUT) : 60000,
   thohHost: process.env.THOH_HOST || 'https://localhost:8443',
   clientId: process.env.CLIENT_ID,
+  thohTeamId: 'thoh',
 };
 
 export default appConfig;

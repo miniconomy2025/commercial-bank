@@ -4,7 +4,7 @@ import accountsRouter from './routes/accounts.router';
 import TestingRouter from './routes/testing.router';
 import loansRouter from './routes/loans.routes';
 import { authMiddleware } from './middlewares/auth.middleware';
-import SimulationRouter from './routes/simulation.routes';
+import SimulationRouter from './routes/thoh.routes';
 import DashboardRouter from './routes/dashboard.routes'
 import cors from 'cors';
 
