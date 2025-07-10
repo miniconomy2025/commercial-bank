@@ -4,7 +4,6 @@ import { logger } from '../utils/logger';
 import { accountMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router()
-router.use(accountMiddleware);
 
 const banks = {
   commercial: 'commercial-bank',
@@ -29,6 +28,19 @@ router.post("/transactions", async (req, res) => {
 
   const { to_account_number, to_bank_name, amount, description } = req.body;
   const from_account_number = req.account!.accountNumber;
+
+  // Check if interbank transfer is needed
+  if (to_bank_name !== "commercial-bank") {
+    switch (to_bank_name) {
+      case "thoh":
+        // TODO: Call THOH /interbank/transfer endpoint
+        break;
+      default:
+        logger.warn(`Interbank transfer to ${to_bank_name} is not implemented yet.`);
+        res.status(400).json({ error: `Interbank transfer to ${to_bank_name} is not supported.` });
+        return;
+    }
+  }
 
   try {
 
