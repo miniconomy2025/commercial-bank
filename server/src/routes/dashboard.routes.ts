@@ -18,7 +18,7 @@ router.get('/accounts', async (req: Request, res: Response) => {
     res.status(200).json(accountsWithLoanBalance);
   } catch (error) {
     logger.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error',  detail:error  });
   }
 });
 
@@ -30,7 +30,7 @@ router.get('/accounts/metrics', async (req: Request, res: Response) => {
     res.status(200).json(expenses);
   } catch (error) {
     logger.error('Error fetching account metrics:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error' , detail:error });
   }
 });
 
@@ -42,7 +42,7 @@ router.get('/loans', async (req: Request, res: Response) => {
     }
     catch (error) {
       logger.error(`Error getting loans for account ${accNo}:`, error);
-      res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ error: "Internal Server Error", detail:error });
     }
 });
 
@@ -54,7 +54,7 @@ router.get('/transactions', async (req: Request, res: Response) => {
     res.status(200).json(allTransactions);
   } catch (error) {
     logger.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error', detail:error  });
   }
 });
 
