@@ -49,4 +49,8 @@ router.get("/status-consumer-logistics", authMiddleware, (req, res) => {
   });
 });
 
+router.post("/send-notification", authMiddleware, (req, res) => {
+  res.status(200).json({ status: "ok", message: "Notification sent successfully" });
+});
+
 export default router;
