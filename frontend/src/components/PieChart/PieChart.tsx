@@ -1,99 +1,84 @@
 import React from 'react';
+import { Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import './PieChart.css';
 
-type PieChartDataItem = {
-  value: number;
-  color: string;
-  label: string;
-};
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+interface Loan {
+  loan_number: string;
+  initial_amount: string;
+  interest_rate: string;
+  started_at: string;
+  write_off: boolean;
+  outstanding_amount: string;
+}
 
 interface PieChartProps {
-  data: PieChartDataItem[];
+  loans: Loan[];
   title: string;
 }
 
-const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-  let currentAngle = 0;
+const PieChart: React.FC<PieChartProps> = ({ loans, title }) => {
+  // Filter written-off and active loans
+  const writtenOff = loans.filter(loan => loan.write_off).length;
+  const active = loans.length - writtenOff;
+
+  // Calculate total equity for active loans
+  const totalEquity = loans
+    .filter(loan => !loan.write_off)
+    .reduce((sum, loan) => {
+      const initial = parseFloat(loan.initial_amount);
+      const outstanding = parseFloat(loan.outstanding_amount);
+      const equity = initial - outstanding;
+      return sum + (isNaN(equity) ? 0 : equity);
+    }, 0)
+    .toFixed(2);
+
+  const data = {
+    labels: ['Written Off', 'Active Loans'],
+    datasets: [
+      {
+        data: [writtenOff, active],
+        backgroundColor: ['#ef4444', '#10b981'],
+        borderColor: ['#fff', '#fff'],
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const percentage = Math.round((value / total) * 100);
+            // Add total equity to the tooltip for Active Loans
+            if (label === 'Active Loans') {
+              return `${label}: ${value} (${percentage}%), Total Equity: $${totalEquity}`;
+            }
+            return `${label}: ${value} (${percentage}%)`;
+          },
+        },
+      },
+    },
+  };
 
   return (
     <section className="piechart-container">
       <h2 className="piechart-title">{title}</h2>
-      <figure className="piechart-figure">
-        <svg width="260" height="260" viewBox="0 0 200 200">
-          <circle
-            cx="100"
-            cy="100"
-            r="90"
-            fill="none"
-            stroke="#f1f5f9"
-            strokeWidth="2"
-          />
-          {data.map((item, index) => {
-            const angle = (item.value / total) * 360;
-            const startAngle = currentAngle;
-            const endAngle = currentAngle + angle;
-            currentAngle += angle;
-
-            const startRadians = (startAngle * Math.PI) / 180;
-            const endRadians = (endAngle * Math.PI) / 180;
-
-            const x1 = 100 + 90 * Math.cos(startRadians);
-            const y1 = 100 + 90 * Math.sin(startRadians);
-            const x2 = 100 + 90 * Math.cos(endRadians);
-            const y2 = 100 + 90 * Math.sin(endRadians);
-
-            const largeArcFlag = angle > 180 ? 1 : 0;
-
-            const pathData = [
-              `M 100 100`,
-              `L ${x1} ${y1}`,
-              `A 90 90 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-              `Z`
-            ].join(' ');
-
-            const midAngle = (startAngle + endAngle) / 2;
-            const midRadians = (midAngle * Math.PI) / 180;
-            const labelX = 100 + 55 * Math.cos(midRadians);
-            const labelY = 100 + 55 * Math.sin(midRadians);
-
-            return (
-              <g key={index}>
-                <path
-                  d={pathData}
-                  fill={item.color}
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                />
-                <text
-                  x={labelX}
-                  y={labelY}
-                  textAnchor="middle"
-                  fill="#ffffff"
-                  fontSize="12"
-                  fontWeight="600"
-                  dy=".35em"
-                  style={{ textShadow: '1px 1px 2px #000000' }}
-                >
-                  {item.label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </figure>
-
-      <ul className="piechart-legend">
-        {data.map((item, index) => (
-          <li key={index} className="piechart-legend-item">
-            <span
-              className="piechart-color-box"
-              style={{ backgroundColor: item.color }}
-            ></span>
-            {item.label}
-          </li>
-        ))}
-      </ul>
+      <div className="piechart-figure" style={{ width: '100%', maxWidth: '400px', margin: '0 auto' }}>
+        <Pie data={data} options={options} />
+      </div>
+      {/* Display total equity below the chart */}
+      <p className="piechart-equity">Total Equity (Active Loans): ${totalEquity}</p>
     </section>
   );
 };

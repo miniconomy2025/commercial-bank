@@ -5,10 +5,53 @@ import PieChart from '../../components/PieChart/PieChart';
 import './Accounts.css';
 import { apiGet } from '../../services/api';
 import type { Account } from '../../types/Accounts';
+import Chart from '../../components/LineChart/LineChart';
+
+const processLoanRepayments = (loans: any[]) => {
+  if (!loans.length) return { data: [], yKeys: [] };
+
+  const sortedLoans = [...loans].sort((a, b) => parseFloat(a.started_at) - parseFloat(b.started_at));
+
+  let timePoints: number[] = [];
+  sortedLoans.forEach(loan => {
+    const start = parseFloat(loan.started_at);
+    timePoints.push(start);
+    for (let i = 1; i <= 5; i++) {
+      timePoints.push(start + i * 30 * 24 * 3600);
+    }
+  });
+  timePoints = Array.from(new Set(timePoints)).sort((a, b) => a - b);
+
+  const data = timePoints.map(time => {
+    const point: any = { epoch: time };
+    sortedLoans.forEach(loan => {
+      const start = parseFloat(loan.started_at);
+      const initialAmount = parseFloat(loan.initial_amount);
+      const outstanding = parseFloat(loan.outstanding_amount);
+      const totalRepaid = initialAmount - outstanding;
+
+      if (time < start) {
+        point[loan.loan_number] = 0;
+      } else if (time >= start + 5 * 30 * 24 * 3600) {
+        point[loan.loan_number] = totalRepaid;
+      } else {
+        const monthsPassed = (time - start) / (30 * 24 * 3600);
+        point[loan.loan_number] = Math.min(totalRepaid, (totalRepaid / 5) * monthsPassed);
+      }
+    });
+    return point;
+  });
+
+  const yKeys = sortedLoans.map(loan => loan.loan_number);
+
+  return { data, yKeys };
+};
+
 
 const IndividualAccountContent = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loans, setLoans] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -16,13 +59,11 @@ const IndividualAccountContent = () => {
 
   const selectedAccount = accounts.find(acc => selectedAccounts.includes(acc.id)) || accounts[0];
 
-  // First, fetch accounts
   useEffect(() => {
     setIsLoading(true);
     apiGet<Account[]>('/dashboard/accounts')
       .then((fetchedAccounts) => {
         setAccounts(fetchedAccounts);
-        // Initialize with only the first account selected
         if (fetchedAccounts.length > 0) {
           setSelectedAccounts([fetchedAccounts[0].id]);
         }
@@ -31,7 +72,6 @@ const IndividualAccountContent = () => {
       .finally(() => setIsLoading(false));
   }, []);
 
-  // Fetch transactions when selected account changes
   useEffect(() => {
     if (!selectedAccount) return;
 
@@ -44,14 +84,24 @@ const IndividualAccountContent = () => {
       .finally(() => setIsTransactionsLoading(false));
   }, [selectedAccount]);
 
-  const expenseData = [
-    { label: 'Office Supplies', value: 2500, color: '#3b82f6' },
-    { label: 'Equipment', value: 4000, color: '#10b981' },
-    { label: 'Software', value: 1500, color: '#f59e0b' },
-    { label: 'Services', value: 2000, color: '#8b5cf6' }
-  ];
+  useEffect(() => {
+    if (!selectedAccount) return;
+    apiGet<any[]>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`)
+      .then((fetchedLoans) => {
+        setLoans(fetchedLoans);
+      })
+      .catch((err) => setError(err.message));
+  }, [selectedAccount]);
 
-  // Show loading state
+  const { data: loanChartData, yKeys: loanChartYKeys } = processLoanRepayments(loans);
+
+  const totalEquity = loans.reduce((sum, loan) => {
+    const initialAmount = parseFloat(loan.initial_amount) || 0;
+    const outstandingAmount = parseFloat(loan.outstanding_amount) || 0;
+    const equity = initialAmount - outstandingAmount;
+    return sum + equity;
+  }, 0).toFixed(2);
+ 
   if (isLoading) {
     return (
       <main className="account-content">
@@ -62,7 +112,6 @@ const IndividualAccountContent = () => {
     );
   }
 
-  // Show error state
   if (error) {
     return (
       <main className="account-content">
@@ -73,7 +122,6 @@ const IndividualAccountContent = () => {
     );
   }
 
-  // Show empty state if no accounts
   if (accounts.length === 0) {
     return (
       <main className="account-content">
@@ -84,7 +132,6 @@ const IndividualAccountContent = () => {
     );
   }
 
-  // Show loading if no selected account yet
   if (!selectedAccount) {
     return (
       <main className="account-content">
@@ -135,10 +182,23 @@ const IndividualAccountContent = () => {
                   {selectedAccount.expenses || '0'}
                 </p>
               </div>
+              <div>
+                <h3 className="metric-label">Total Loan Equity</h3>
+                <p className="metric-value text-info">
+                  {totalEquity}
+                </p>
+              </div>
             </div>
 
             <div style={{ marginTop: '32px' }}>
-              <PieChart data={expenseData} title="Expense Breakdown" />
+              <PieChart loans={loans} title="Loan Breakdown" />
+              <Chart
+                title="Loan Repayments over time"
+                data={loanChartData}
+                xKey="epoch"
+                yKeys={loanChartYKeys}
+              />
+
             </div>
           </article>
         </div>
