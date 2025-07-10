@@ -1,23 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { getAllAccountExpenses, getAllExistingAccounts, getAllExistingTransactions, getLoanBalances } from '../queries/dashboard.queries';
-import appConfig from '../config/app.config';
 import { getLoanSummariesForAccount } from '../queries/loans.queries';
 
 const router = Router();
-router.use((req: Request, res: Response, next: () => void) => {
-  const dashboardId = req.query.clientId;
-  if (!dashboardId) {
-    res.status(400).json({ error: 'Dashboard ID is required' });
-    return;
-  }
-  if (dashboardId !== appConfig.clientId) {
-    res.status(400).json({ error: 'Invalid dashboard ID' });
-    return;
-  }
-
-  next();
-});
 
 router.get('/accounts', async (req: Request, res: Response) => {
   try {

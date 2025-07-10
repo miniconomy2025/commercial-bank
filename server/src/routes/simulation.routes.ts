@@ -9,15 +9,7 @@ import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.qu
 
 const router = Router();
 
-router.use((req, res, next) => {
-    if (req.teamId !== appConfig.thohTeamId) {
-        res.status(403).json({ error: "Forbidden: Only THOH can access this endpoint" });
-        return;
-    }
-    next();
-});
-
-router.post("/simulation/start", async (req, res) => {
+router.post("/start", async (req, res) => {
     const { startingTime, startingBalance, fromAccountNumber } = snakeToCamelCaseMapper(req.body);
     try {
         if (!startingTime || !startingBalance || !fromAccountNumber) {
@@ -38,7 +30,7 @@ router.post("/simulation/start", async (req, res) => {
     }
 });
 
-router.post("/simulation/end", async (req, res) => {
+router.post("/end", async (req, res) => {
     try {
         endSimulation();
         res.status(200).send();
@@ -47,7 +39,7 @@ router.post("/simulation/end", async (req, res) => {
     }
 });
 
-router.get('/thoh/accounts', async (req , res) => {
+router.get('/accounts', async (req , res) => {
   try {
     const accounts = (await getAllExistingAccounts());
     const accountIds = accounts.map((account: any) => account.id);
