@@ -7,9 +7,9 @@ import https from 'https';
 const PORT = process.env.PORT;
 
 const options = {
-  key: fs.readFileSync('server.key'),
-  cert: fs.readFileSync('server.crt'),
-  ca: fs.readFileSync('ca.crt'),
+  key: fs.readFileSync(appConfig.keyPath),
+  cert: fs.readFileSync(appConfig.certPath),
+  ca: fs.readFileSync(appConfig.caPath),
   requestCert: true,
   rejectUnauthorized: true
 };
