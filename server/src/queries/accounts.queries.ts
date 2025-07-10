@@ -47,7 +47,7 @@ export const getAccountInformation = async (teamId: string) => {
       SUM(CASE WHEN transactions."from" = accounts.id THEN transactions.amount ELSE 0 END) AS net_balance,
       account_number
       FROM accounts
-      INNER JOIN transactions ON (transactions."to" = accounts.id OR transactions."from" = accounts.id)
+      LEFT JOIN transactions ON (transactions."to" = accounts.id OR transactions."from" = accounts.id)
       WHERE accounts.team_id = $1
       GROUP BY accounts.id, accounts.account_number;`,
       [teamId]

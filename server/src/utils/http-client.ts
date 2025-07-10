@@ -5,6 +5,7 @@ import { Observable, throwError } from "rxjs";
 import { catchError, timeout } from "rxjs/operators";
 import appConfig from "../config/app.config";
 import { snakeToCamelCaseMapper } from "./mapper";
+import { rootCertificates } from 'tls';
 
 interface HttpClientResponse<T = any> {
   statusCode?: number;
@@ -18,7 +19,10 @@ export class HttpClient {
     this.httpsAgent = new https.Agent({
       key: fs.readFileSync(appConfig.keyPath!),
       cert: fs.readFileSync(appConfig.certPath!),
-      ca: fs.readFileSync(appConfig.caPath!),
+      ca: [
+        ...rootCertificates,
+        fs.readFileSync(appConfig.caPath!),
+      ],
       rejectUnauthorized: true,
     });
   }
