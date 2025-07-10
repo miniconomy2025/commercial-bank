@@ -4,10 +4,17 @@ import { endSimulation, getDateTimeAsISOString, initSimulation } from "../utils/
 import { createTransaction } from "../queries/transactions.queries";
 import { getAccountFromOrganizationUnit } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
+import { attemptInstalments } from "../queries/loans.queries";
+
+import appConfig from "../config/app.config";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 import { setLoanInterestRate } from "../queries/loans.queries";
 
 const router = Router();
+
+function onEachDay() {
+    attemptInstalments();
+}
 
 router.post("/start", async (req, res) => {
     try {
@@ -26,9 +33,10 @@ router.post("/start", async (req, res) => {
             res.status(400).json({ error: "Bad Request: Missing required fields: starting_time, starting_balance, from_account_number" });
             return;
         }
-        initSimulation(startingTime + 10); // Offset by 10ms to account for minor network/request latency
+
         setLoanInterestRate(Number(prime_rate))
         const fromAccountNumber = await getAccountFromOrganizationUnit('thoh').then(account => account?.accountNumber);
+        initSimulation(startingTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
         const toAccountNumber = await getAccountFromOrganizationUnit('commercial-bank').then(account => account?.accountNumber);
         if (!toAccountNumber) {
             res.status(404).json({ error: "Commercial bank account not found" });

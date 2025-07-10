@@ -58,7 +58,7 @@ router.post("/", async (req, res) => {
     );
     res.status(200).json(newTransaction);
   } catch (error) {
-    logger.error("Error creating transaction:", error);
+    console.log("Error creating transaction:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
