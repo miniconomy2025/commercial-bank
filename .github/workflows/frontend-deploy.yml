@@ -18,7 +18,7 @@ jobs:
 
       - name: Write server.key from secret
         run: |
-          echo "VITE_CLIENT_ID=${{ secrets.CLIENT_ID }}\n" > ./frontend/.env.production
+          echo "VITE_CLIENT_ID=${{ secrets.CLIENT_ID }}" > ./frontend/.env.production
 
       - name: Install frontend dependencies and build
         run: |
