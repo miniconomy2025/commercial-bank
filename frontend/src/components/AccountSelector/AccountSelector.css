@@ -1,0 +1,48 @@
+.account-selector {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+
+.account-selector-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+}
+
+.account-selector-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+
+
+}
+
+.account-button {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: white;
+  color: black;
+  border: 2px solid black;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14pt;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+.account-button:hover {
+  background-color: #f4f4f5;
+}
+
+.account-button.selected {
+  background-color: black;
+  color: white;
+}

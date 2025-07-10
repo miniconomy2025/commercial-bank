@@ -1,0 +1,115 @@
+name: Deploy Backend
+
+on:
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "server/**"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Write server.key from secret
+        run: |
+          mkdir -p ./server
+          echo "${{ secrets.SERVER_PKEY }}" > ./server/server.key
+          chmod 600 ./server/server.key
+
+      - name: Copy files to EC2 with scp
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: "./server/"
+          target: "/home/${{ vars.EC2_USER }}/cb-api-server/"
+          rm: true
+
+      - name: Run remote commands on EC2 (no Nginx)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            API_DOMAIN="${{ vars.API_DOMAIN }}"
+            APP_DIR="/home/${{ vars.EC2_USER }}/cb-api-server/server"
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+            echo "--- Deploying to EC2: $(pwd) ---"
+
+            # Install NVM and Node.js 22.13.0
+            export NVM_DIR="$HOME/.nvm"
+            if [ ! -d "$NVM_DIR" ]; then
+              echo "Installing NVM..."
+              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+            fi
+            source "$NVM_DIR/nvm.sh"
+
+            if ! node -v | grep -q "v22.13.0"; then
+              echo "Installing Node.js v22.13.0..."
+              nvm install 22.13.0
+              nvm alias default 22.13.0
+              nvm use 22.13.0
+            fi
+
+            # Ensure PM2 is installed
+            if ! command -v pm2 &> /dev/null; then
+              echo "Installing PM2..."
+              npm install -g pm2
+            fi
+
+            echo "Writing environment variables to .env..."
+            cat <<EOF > "$APP_DIR/.env.production"
+            NODE_ENV=production
+            PORT=443
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            CA_CERT_PATH=ca.crt
+            SERVER_KEY_PATH=server.key
+            SERVER_CERT_PATH=server.crt
+            TIMEOUT=6000
+            EOF
+
+            # Install app dependencies
+            echo "Installing app dependencies..."
+            npm ci
+
+            # Build the app
+            echo "Building the app..."
+            npm run build
+
+            # Allow Node.js to bind to port 443
+            echo "Setting setcap for Node.js..."
+            NODE_PATH=$(which node)
+            sudo setcap 'cap_net_bind_service=+ep' "$NODE_PATH"
+
+            # Copy runtime files to dist/
+            echo "Copying runtime files to dist/ ..."
+            mkdir -p dist
+            rsync -av --exclude='src' --exclude='node_modules' --exclude='dist' ./ dist/
+
+            # Start/restart the app with PM2
+            echo "Starting/Restarting commercial-bank-api with PM2..."
+            cd dist
+            export NODE_ENV=production
+            if pm2 show commercial-bank-api &> /dev/null; then
+              pm2 restart commercial-bank-api
+            else
+              pm2 start server.js --name commercial-bank-api
+            fi
+            pm2 save
+
+            echo "Deployment complete."

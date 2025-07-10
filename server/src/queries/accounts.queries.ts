@@ -1,7 +1,6 @@
 import { ITask } from "pg-promise";
-import appConfig from "../config/app.config";
 import db from "../config/db.config";
-import { SimTime } from "../utils/time";
+import { getSimTime, SimTime } from "../utils/time";
 
 export const getCommercialBankAccountRefId = async (t?: ITask<{}>): Promise<number | null> =>
   (await (t ?? db).oneOrNone(`SELECT id FROM account_refs WHERE team_id = 'commercial-bank' LIMIT 1`))?.id ?? null;
@@ -9,28 +8,52 @@ export const getCommercialBankAccountRefId = async (t?: ITask<{}>): Promise<numb
 export const getCommercialBankAccountNumber = async (t?: ITask<{}>): Promise<string | null> =>
   (await (t ?? db).oneOrNone(`SELECT account_number FROM accounts WHERE team_id = 'commercial-bank' LIMIT 1`))?.account_number ?? null;
 
-// This function serves as an example of how to query the database and will be removed later.
-export const getAllAccounts = async (t?: ITask<{}>): Promise<string[]> => {
-  return appConfig.isDev? (t ?? db).any('SELECT account_number FROM accounts'): [];
-};
-
-export const createAccount = async (notification_url: string, created_at: SimTime, bank_id: Number): Promise<createAccountResponse> => {
-  const account = await db.one(
-    'INSERT INTO accounts (account_number,notification_url, created_at) VALUES (generate_unique_account_number(),$1, $2) RETURNING account_number,created_at',
-    [notification_url, created_at, bank_id]
+export const doesAccountExist = async (teamId: string): Promise<boolean> => {
+  const account = await db.oneOrNone(
+    `SELECT 1 FROM accounts WHERE team_id = $1`,
+    [teamId]
   );
 
-  return account;
+  return !!account;
 };
 
-export const insertAccountRef = async (account_number: string, bank_id: number): Promise<void> => {
-  await db.result(  
-    'INSERT INTO account_refs(account_number, bank_id) VALUES ($1, $2)',
-    [account_number, bank_id]
-  );
+export interface CreateAccountResult {
+    account_number: string;
 }
 
-export type createAccountResponse = {
-  account_number: string;
-  created_at: SimTime;
-};
+export const createAccount = async (
+    createdAt: number,
+    notificationUrl: string,
+    teamId: string
+): Promise<CreateAccountResult> => {
+    try {
+        const result = await db.oneOrNone<{ create_account: string }>(
+          'SELECT create_account($1, $2, $3)',
+          [createdAt, notificationUrl, teamId]
+        );
+        
+        return result ? { account_number: result.create_account } : { account_number: "" };
+    } catch (error) {
+        console.error('Error creating account:', error);
+        throw error;
+    }
+}
+
+export const getAccountInformation = async (teamId: string) => {
+  try {
+    const accountInformation = await db.oneOrNone(
+      `SELECT 
+      SUM(CASE WHEN transactions."to" = accounts.id THEN transactions.amount ELSE 0 END) - 
+      SUM(CASE WHEN transactions."from" = accounts.id THEN transactions.amount ELSE 0 END) AS net_balance,
+      account_number
+      FROM accounts
+      INNER JOIN transactions ON (transactions."to" = accounts.id OR transactions."from" = accounts.id)
+      WHERE accounts.team_id = $1
+      GROUP BY accounts.id, accounts.account_number;`,
+      [teamId]
+    )
+    return accountInformation
+  } catch (error: any) {
+    return error.message
+  }
+}

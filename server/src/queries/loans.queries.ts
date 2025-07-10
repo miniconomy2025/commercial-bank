@@ -59,7 +59,7 @@ export const createLoan = async (
 
 
     // Insert transaction
-    const transaction = await createTransaction(accountNumber, 'commercial-bank', bankAccNo, amount, `Loan disbursement to ${accountNumber}`, getSimTime());
+    const transaction = await createTransaction(accountNumber, bankAccNo, amount, `Loan disbursement to ${accountNumber}`);
 
     // Insert loan
     const loan = await t.one<LoanResult>(
@@ -67,10 +67,10 @@ export const createLoan = async (
       INSERT INTO loans (
         loan_number, initial_transaction_id, interest_rate, started_at, write_off
       ) VALUES (
-        generate_unique_loan_number(), $1, $2, now(), false
+        generate_unique_loan_number(), $1, $2, $3, false
       ) RETURNING loan_number, initial_transaction_id, interest_rate, started_at, write_off
       `,
-      [ transaction.transaction_id, interestRate ]
+      [ transaction.transaction_id, interestRate, getSimTime() ]
     );
 
     return { success: true, ...loan };
@@ -181,7 +181,7 @@ export const repayLoan = async (
 
 
     // Create repayment transaction
-    const transaction = await createTransaction(bankAccNo, 'commercial-bank', accountNumber, repayment, `Repayment of loan ${loanNumber}`, getSimTime());
+    const transaction = await createTransaction(bankAccNo, accountNumber, repayment, `Repayment of loan ${loanNumber}`);
 
     // Link repayment to the loan
     await t.none(`
