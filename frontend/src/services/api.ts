@@ -1,4 +1,4 @@
-const BASE_URL = 'https://commercial-bank-api.projects.bbdgrad.com/api';
+const BASE_URL = 'https://commercial-bank.projects.bbdgrad.com/api';
 
 export async function apiGet<T>(endpoint: string): Promise<T> {
   try {
