@@ -21,12 +21,12 @@ export const getAllExistingTransactions = async (account: string | undefined): P
   `;
 
   if (account) {
-    return await db.many(`
+    return await db.manyOrNone(`
       ${baseQuery}
       WHERE from_acc.team_id = $1 OR to_acc.team_id = $1
     `, [account]);
   } else {
-    return await db.many(baseQuery);
+    return await db.manyOrNone(baseQuery);
   }
 };
 
@@ -67,7 +67,7 @@ export const getAllExistingAccounts = async (): Promise<Accounts[]> => {
 };
 
 export const getAllAccountExpenses = async (accountId: number): Promise<Expenses[]> => {
-  return await db.many(`
+  return await db.manyOrNone(`
     SELECT 
       t.description,
       t.amount
