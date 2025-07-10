@@ -8,7 +8,7 @@ const router = Router()
 
 router.use(accountMiddleware);
 // Take out a loan
-router.post("/loan", async (req, res) => {
+router.post("/", async (req, res) => {
   const { amount } = req.body;
   const borrowerAccNo = req.account!.accountNumber;
   try {
@@ -24,7 +24,7 @@ router.post("/loan", async (req, res) => {
 
 // List all loans for the account
 // NOTE: Only the original borrower can get details for their loan
-router.get("/loan", async (req, res) => {
+router.get("/", async (req, res) => {
   const accNo = req.account!.accountNumber;
 
   try {
@@ -40,7 +40,7 @@ router.get("/loan", async (req, res) => {
 
 // Repay loan
 // NOTE: Any account can contribute to the repayment of a loan on any other account
-router.post("/loan/:loan_number/pay", async (req, res) => {
+router.post("/:loan_number/pay", async (req, res) => {
   const { amount } = req.body;
   const { loan_number } = req.params;
 
@@ -59,7 +59,7 @@ router.post("/loan/:loan_number/pay", async (req, res) => {
 
 // Get specific loan details
 // NOTE: Only the account which took out the loan can get loan details
-router.get("/loan/:loan_number", async (req, res) => {
+router.get("/:loan_number", async (req, res) => {
   const { loan_number } = req.params;
   const accNo = req.account!.accountNumber;
 
@@ -75,7 +75,7 @@ router.get("/loan/:loan_number", async (req, res) => {
 
 //update the prime rate
 //NOTE: oly the hand can update this
-router.post("loan/prime_rate",async (req,res) =>{
+router.post("/prime_rate",async (req,res) =>{
   const teamId = req.teamId
   const {prime_rate} = req.body;
   if (teamId!=="thoh"){
