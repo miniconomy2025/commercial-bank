@@ -21,7 +21,7 @@ app.use(cors({
   credentials: true
 }));
 
-httpClient.get('retail-bank-api.projects.bbdgrad.com/accounts').subscribe({
+httpClient.get('https://retail-bank-api.projects.bbdgrad.com/accounts').subscribe({
   next: (response) => {
     console.log('Accounts fetched successfully:', response);
   },
