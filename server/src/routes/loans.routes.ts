@@ -8,6 +8,7 @@ const router = Router()
 
 // Take out a loan
 router.post("/loan", async (req, res) => {
+  // TODO Return failure reason
   const { amount } = req.body;
   const borrowerAccNo = req.account!.accountNumber;
   try {

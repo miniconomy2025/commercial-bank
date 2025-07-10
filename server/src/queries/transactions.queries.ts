@@ -37,10 +37,11 @@ export const getTransactionStatusId = async (statusName: string): Promise<number
 export const createTransaction = async (
     recipient_account_number: string,
     sender_account_number: string,
-    amount:number,
+    amount: number,
     description: string,
     sender_bank_name: string = 'commercial-bank',
     recipient_bank_name: string = 'commercial-bank',
+    transactionNumber?: string
   )
 : Promise<CreateTransactionResult> => {
   return db.one(
@@ -48,7 +49,7 @@ export const createTransaction = async (
       inserted AS (
         INSERT INTO transactions (transaction_number, "from", "to", amount, description, status_id, created_at)
         VALUES (
-          generate_unique_transaction_number(),
+          COALESCE($8, generate_unique_transaction_number()),
           get_or_create_account_ref_id($1, $2),
           get_or_create_account_ref_id($3, $4),
           $5, $6, 1, $7
@@ -62,7 +63,7 @@ export const createTransaction = async (
   FROM inserted i
   JOIN transaction_statuses s ON s.id = i.status_id;
   `,
-    [sender_account_number, sender_bank_name, recipient_account_number, recipient_bank_name, amount, description, getSimTime()]
+    [sender_account_number, sender_bank_name, recipient_account_number, recipient_bank_name, amount, description, getSimTime(), transactionNumber ?? null]
   );
 }
 

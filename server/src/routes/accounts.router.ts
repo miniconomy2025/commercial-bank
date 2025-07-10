@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { createAccount, CreateAccountResult, getAccountInformation } from '../queries/accounts.queries';
+import { createAccount, CreateAccountResult, getAccountInformation, updateAccountNotificationUrl } from '../queries/accounts.queries';
+import { interbankTransfer } from '../queries/banks.queries';
 import { logger } from '../utils/logger';
 import { getSimTime } from '../utils/time';
 import { snakeToCamelCaseMapper } from '../utils/mapper';
@@ -22,7 +23,7 @@ router.get('/account', async (req: Request,res: Response) => {
   }
 });
 
-router.post('/accounts', async (req: Request, res: Response) => {
+router.post('/account', async (req: Request, res: Response) => {
   try {
 
     const createdAt = getSimTime();
@@ -50,6 +51,56 @@ router.post('/accounts', async (req: Request, res: Response) => {
 
   } catch (error) {
     logger.error('Error creating account:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.post('/interbank-transfer', async (req: Request, res: Response) => {
+  try {
+    const { transactionNumber, fromBankTeamId, fromAccountNumber, toAccountNumber, amount, description } = req.body;
+
+    if (!transactionNumber || !fromBankTeamId || !fromAccountNumber || !toAccountNumber || !amount || !description) {
+      res.status(400).json({ error: 'All fields are required' });
+      return;
+    }
+
+    const transferResult = await interbankTransfer(
+      transactionNumber,
+      fromBankTeamId,
+      fromAccountNumber,
+      toAccountNumber,
+      amount,
+      description
+    );
+
+    if (transferResult.success) {
+      res.status(200).json({ message: 'Transfer successful' });
+    }
+    else {
+      res.status(400).json({ error: transferResult.error });
+    }
+  } catch (error) {
+    logger.error('Error processing interbank transfer:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.post('/account/me/notify', async (req: Request, res: Response) => {
+  try {
+    const { notification_url } = req.body;
+    const teamId = req.account?.teamId;
+
+    if (!notification_url) {
+      return res.status(400).json({ error: 'notification_url is required' });
+    }
+    if (!teamId) {
+      return res.status(403).json({ error: 'Not authenticated' });
+    }
+
+    await updateAccountNotificationUrl(teamId, notification_url);
+    res.status(200).json({ message: 'Notification URL updated' });
+  } catch (error) {
+    logger.error('Error updating notification URL:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

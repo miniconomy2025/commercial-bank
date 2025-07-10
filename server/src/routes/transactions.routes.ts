@@ -20,10 +20,22 @@ router.get("/transactions", async (req, res) => {
 
 router.post("/transactions", async (req, res) => {
 
-  const createdAt = getSimTime();
   const { to_account_number, to_bank_name, amount, description } = req.body;
 
   const from_account_number = req.account!.accountNumber;
+
+  // Check if interbank transfer is needed
+  if (to_bank_name !== "commercial-bank") {
+    switch (to_bank_name) {
+      case "thoh":
+        // TODO: Call THOH /interbank/transfer endpoint
+        break;
+      default:
+        logger.warn(`Interbank transfer to ${to_bank_name} is not implemented yet.`);
+        return res.status(400).json({ error: `Interbank transfer to ${to_bank_name} is not supported.` });
+    }
+  }
+
   
   try {
     const newTransaction = await createTransaction(

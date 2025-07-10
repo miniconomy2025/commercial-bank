@@ -1,6 +1,5 @@
 import { ITask } from "pg-promise";
 import db from "../config/db.config";
-import { getSimTime, SimTime } from "../utils/time";
 
 export const getCommercialBankAccountRefId = async (t?: ITask<{}>): Promise<number | null> =>
   (await (t ?? db).oneOrNone(`SELECT id FROM account_refs WHERE team_id = 'commercial-bank' LIMIT 1`))?.id ?? null;
@@ -17,9 +16,10 @@ export const doesAccountExist = async (teamId: string): Promise<boolean> => {
   return !!account;
 };
 
-export interface CreateAccountResult {
-    account_number: string;
-}
+export const getAccountBalance = async (accountNumber: string, t?: ITask<{}>): Promise<number | null> =>
+  (await (t ?? db).oneOrNone(`SELECT * FROM get_account_balance($1) AS balance`, [accountNumber]))?.balance ?? null;
+
+export interface CreateAccountResult { account_number: string; }
 
 export const createAccount = async (
     createdAt: number,
@@ -39,9 +39,10 @@ export const createAccount = async (
     }
 }
 
-export const getAccountInformation = async (teamId: string) => {
+export type AccountInfo = { net_balance: number; account_number: string; };
+export const getAccountInformation = async (teamId: string): Promise<AccountInfo | null> => {
   try {
-    const accountInformation = await db.oneOrNone(
+    const accountInformation = await db.oneOrNone<AccountInfo>(
       `SELECT 
       SUM(CASE WHEN transactions."to" = accounts.id THEN transactions.amount ELSE 0 END) - 
       SUM(CASE WHEN transactions."from" = accounts.id THEN transactions.amount ELSE 0 END) AS net_balance,
@@ -52,8 +53,14 @@ export const getAccountInformation = async (teamId: string) => {
       GROUP BY accounts.id, accounts.account_number;`,
       [teamId]
     )
-    return accountInformation
-  } catch (error: any) {
-    return error.message
+    return accountInformation;
   }
+  catch (error: any) { return error.message }
 }
+
+export const updateAccountNotificationUrl = async (teamId: string, notificationUrl: string): Promise<void> => {
+  await db.none(
+    `UPDATE accounts SET notification_url = $1 WHERE team_id = $2`,
+    [notificationUrl, teamId]
+  );
+};
