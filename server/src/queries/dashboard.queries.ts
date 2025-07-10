@@ -1,4 +1,5 @@
 import db from "../config/db.config";
+import { SimTime } from "../utils/time";
 
 
 export const getAllExistingTransactions = async (account: string | undefined): Promise<Transaction[]> => {
@@ -9,7 +10,8 @@ export const getAllExistingTransactions = async (account: string | undefined): P
       t.amount,
       t.description,
       from_acc.team_id AS from,
-      to_acc.team_id AS to
+      to_acc.team_id AS to,
+      t.created_at as time
     FROM transactions t
     JOIN transaction_statuses ts ON t.status_id = ts.id
     JOIN account_refs from_ref ON t."from" = from_ref.id
@@ -32,6 +34,7 @@ export const getAllExistingAccounts = async (): Promise<Accounts[]> => {
   return await db.many(`
     SELECT 
       a.id,
+      a.account_number as account_number,
       a.team_id as name,
       COALESCE(account_totals.balance, 0) as balance,
       COALESCE(account_totals.income, 0) as income,
@@ -107,6 +110,7 @@ export type Transaction = {
     description:string;
     from:string;
     to:string;
+    time:SimTime;
 };
 
 export type loan = {
@@ -118,6 +122,7 @@ export type loan = {
 
 export type Accounts = {
     id:number;
+    account_number:string;
     name:string;
     balance: number;
     income:number;

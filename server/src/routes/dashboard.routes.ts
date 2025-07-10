@@ -1,22 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { getAllAccountExpenses, getAllExistingAccounts, getAllExistingTransactions, getLoanBalances } from '../queries/dashboard.queries';
-import appConfig from '../config/app.config';
+import { getLoanSummariesForAccount } from '../queries/loans.queries';
 
 const router = Router();
-router.use((req: Request, res: Response, next: () => void) => {
-  const dashboardId = req.query.clientId;
-  if (!dashboardId) {
-    res.status(400).json({ error: 'Dashboard ID is required' });
-    return;
-  }
-  if (dashboardId !== appConfig.clientId) {
-    res.status(400).json({ error: 'Invalid dashboard ID' });
-    return;
-  }
-
-  next();
-});
 
 router.get('/accounts', async (req: Request, res: Response) => {
   try {
@@ -31,7 +18,7 @@ router.get('/accounts', async (req: Request, res: Response) => {
     res.status(200).json(accountsWithLoanBalance);
   } catch (error) {
     logger.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error',  detail:error  });
   }
 });
 
@@ -43,17 +30,20 @@ router.get('/accounts/metrics', async (req: Request, res: Response) => {
     res.status(200).json(expenses);
   } catch (error) {
     logger.error('Error fetching account metrics:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error' , detail:error });
   }
 });
 
 router.get('/loans', async (req: Request, res: Response) => {
-  try {
-    res.status(200).json();
-  } catch (error) {
-    logger.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
+  const accNo = req.query.accountNumber as string
+   try {
+      const loanSummaries = await getLoanSummariesForAccount(accNo);
+      res.status(200).json(loanSummaries);
+    }
+    catch (error) {
+      logger.error(`Error getting loans for account ${accNo}:`, error);
+      res.status(500).json({ error: "Internal Server Error", detail:error });
+    }
 });
 
 
@@ -64,7 +54,7 @@ router.get('/transactions', async (req: Request, res: Response) => {
     res.status(200).json(allTransactions);
   } catch (error) {
     logger.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error', detail:error  });
   }
 });
 

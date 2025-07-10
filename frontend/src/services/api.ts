@@ -5,7 +5,9 @@ const clientId = urlParams.get('clientId');
 
 export async function apiGet<T>(endpoint: string): Promise<T> {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}?clientId=${clientId}`, {
+    const hasQuery = endpoint.includes('?');
+    const url = `${BASE_URL}${endpoint}${hasQuery ? '&' : '?'}clientId=${clientId}`;
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

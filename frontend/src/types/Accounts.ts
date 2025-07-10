@@ -1,4 +1,5 @@
 export type Account =  {
+  account_number: string;
   id: string;
   name: string;
   color: string;

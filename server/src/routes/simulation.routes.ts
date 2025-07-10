@@ -23,7 +23,7 @@ router.use((req, res, next) => {
     next();
 });
 
-router.post("/simulation/start", async (req, res) => {
+router.post("/start", async (req, res) => {
     const { startingTime, startingBalance, fromAccountNumber } = snakeToCamelCaseMapper(req.body);
     try {
         if (!startingTime || !startingBalance || !fromAccountNumber) {
@@ -44,7 +44,7 @@ router.post("/simulation/start", async (req, res) => {
     }
 });
 
-router.post("/simulation/end", async (req, res) => {
+router.post("/end", async (req, res) => {
     try {
         endSimulation();
         res.status(200).send();
