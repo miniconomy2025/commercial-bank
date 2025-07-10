@@ -2,11 +2,8 @@ import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
 import { logger } from '../utils/logger';
-import { accountMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router()
-
-router.use(accountMiddleware);
 // Take out a loan
 router.post("/", async (req, res) => {
   const { amount } = req.body;
