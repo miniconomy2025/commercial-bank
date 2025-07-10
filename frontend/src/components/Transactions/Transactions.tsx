@@ -7,7 +7,7 @@ interface RecentTransactionsProps {
   transactions: Transaction[];
 }
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 5;
 
 const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transactions }) => {
   const [currentPage, setCurrentPage] = useState(0);
