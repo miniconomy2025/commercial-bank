@@ -14,7 +14,14 @@ const options = {
   rejectUnauthorized: true
 };
 
-https.createServer(options, app).listen(PORT, () => {
-  logger.info(`Server is running in ${appConfig.env} mode on port ${PORT} with mTLS`);
-});
+if (appConfig.isProd) {
+  https.createServer(options, app).listen(PORT, () => {
+    logger.info(`Server is running in ${appConfig.env} mode on port ${PORT}`);
+  });
+} else {
+  app.listen(PORT, () => {
+    logger.info(`Server is running in ${appConfig.env} mode on port ${PORT}`);
+  });
+}
+
 
