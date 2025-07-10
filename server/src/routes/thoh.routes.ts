@@ -47,7 +47,7 @@ router.post("/simulation/end", async (req, res) => {
     }
 });
 
-router.get('/accounts', async (req , res) => {
+router.get('/thoh/accounts', async (req , res) => {
   try {
     const accounts = (await getAllExistingAccounts());
     const accountIds = accounts.map((account: any) => account.id);
