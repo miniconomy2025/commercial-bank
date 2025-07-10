@@ -16,17 +16,6 @@ router.get("/status-sumsang-phone", authMiddleware, (req, res) => {
   });
 });
 
-router.get("/status-retail-bank", authMiddleware, (req, res) => {
-  httpClient.get("https://retail-bank-api.projects.bbdgrad.com/accounts").subscribe({
-    next: (response) => {
-      res.json({ status: "ok", message: response});
-    },
-    error: (error) => {
-      res.status(500).json({ status: "error", error });
-    }
-  });
-});
-
 router.get("/status-commercial-bank", authMiddleware, (req, res) => {
   httpClient.get("https://commercial-bank-api.projects.bbdgrad.com/api/account").subscribe({
     next: (response) => {
