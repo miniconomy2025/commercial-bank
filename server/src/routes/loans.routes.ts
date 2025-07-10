@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
-import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan } from '../queries/loans.queries';
+import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
 import { logger } from '../utils/logger';
 
 const router = Router()
@@ -69,6 +69,19 @@ router.get("/loan/:loan_number", async (req, res) => {
   catch (error) {
     logger.error("Error getting loan details:", error);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+//update the prime rate
+//NOTE: oly the hand can update this
+router.post("loan/prime_rate",async (req,res) =>{
+  const teamId = req.account?.teamId;
+  const {prime_rate} = req.body;
+  if (teamId!=="thoh"){
+    res.status(400).json("Only the hand can change the prime rate");
+  } else {
+    setLoanInterestRate(Number(prime_rate));
+    res.status(200).json({ status: "Prime rate updated successfully" ,prime_rate: prime_rate });
   }
 });
 
