@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { getAllAccountExpenses, getAllExistingAccounts, getAllExistingTransactions, getLoanBalances } from '../queries/dashboard.queries';
 import appConfig from '../config/app.config';
+import { getLoanSummariesForAccount } from '../queries/loans.queries';
 
 const router = Router();
 router.use((req: Request, res: Response, next: () => void) => {
@@ -48,12 +49,15 @@ router.get('/accounts/metrics', async (req: Request, res: Response) => {
 });
 
 router.get('/loans', async (req: Request, res: Response) => {
-  try {
-    res.status(200).json();
-  } catch (error) {
-    logger.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
+  const accNo = req.query.accountNumber as string
+   try {
+      const loanSummaries = await getLoanSummariesForAccount(accNo);
+      res.status(200).json(loanSummaries);
+    }
+    catch (error) {
+      logger.error(`Error getting loans for account ${accNo}:`, error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
 });
 
 

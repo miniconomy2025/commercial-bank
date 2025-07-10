@@ -7,15 +7,76 @@ import type { Account } from '../../types/Accounts';
 import type { Transaction } from '../../types/Transaction';
 import { apiGet } from '../../services/api';
 
-const generatePoints = (index: number, varianceBase: number, yOffset: number): number[] => {
-  const points: number[] = [];
-  const variance = Math.random() * varianceBase + 10;
-  for (let i = 0; i <= 12; i++) {
-    const noise = (Math.sin(i * 0.8 + index) + Math.cos(i * 1.2)) * variance;
-    const y = yOffset + (index * 15) + noise;
-    points.push(Math.max(10, Math.min(150, y)));
+ const processBalanceData = (
+  accounts: Account[],
+  selectedAccounts: string[],
+  transactions: Transaction[],
+  maxPoints = 10
+): {
+  data: any[],
+  yKeys: string[]
+} => {
+  if (!accounts.length || !selectedAccounts.length || !transactions.length) {
+    return { data: [], yKeys: [] };
   }
-  return points;
+
+  const txns = transactions
+    .map(txn => ({
+      ...txn,
+      time: Number(txn.time) || 0,
+      amount: Number(txn.amount) || 0,
+    }))
+    .filter(txn => !isNaN(txn.time) && !isNaN(txn.amount))
+    .sort((a, b) => a.time - b.time);
+
+  let uniqueTimes = Array.from(new Set(txns.map(t => t.time))).sort((a, b) => a - b);
+
+  if (uniqueTimes.length > maxPoints) {
+    const step = (uniqueTimes.length - 1) / (maxPoints - 1);
+    uniqueTimes = Array.from({ length: maxPoints }, (_, i) =>
+      uniqueTimes[Math.floor(i * step)]
+    );
+  }
+
+  const balancesByAccount: Record<string, number[]> = {};
+
+  selectedAccounts.forEach(accountId => {
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return;
+
+    const balances: number[] = [];
+    let balance = 0;
+    let txnIndex = 0;
+
+    uniqueTimes.forEach(time => {
+      while (txnIndex < txns.length && txns[txnIndex].time <= time) {
+        const txn = txns[txnIndex];
+        if (txn.from === account.name) balance -= txn.amount;
+        if (txn.to === account.name) balance += txn.amount;
+        txnIndex++;
+      }
+      balances.push(balance);
+    });
+
+    balancesByAccount[account.name] = balances;
+  });
+
+  const chartData = uniqueTimes.map((time, index) => {
+    const row: Record<string, number> = { epoch: time };
+    selectedAccounts.forEach(accountId => {
+      const account = accounts.find(a => a.id === accountId);
+      if (account) {
+        row[account.name] = balancesByAccount[account.name]?.[index] || 0;
+      }
+    });
+    return row;
+  });
+
+  const yKeys = selectedAccounts
+    .map(id => accounts.find(a => a.id === id)?.name)
+    .filter((name): name is string => !!name);
+
+  return { data: chartData, yKeys };
 };
 
 const AggregationContent = () => {
@@ -48,6 +109,12 @@ const AggregationContent = () => {
     );
   };
 
+  const { data: loanChartData, yKeys: loanChartYKeys } = processBalanceData(
+    accounts,
+    selectedAccounts,
+    transactions
+  );
+
   return (
     <div className="aggregation-container">
       <div className="charts-column">
@@ -59,17 +126,11 @@ const AggregationContent = () => {
           />
           <div className="chart-section">
             <Chart
-              selectedAccounts={selectedAccounts}
-              title="Balances over time"
-              curveFn={(index:number) => generatePoints(index, 30, 40)}
-              accounts={accounts}
-            />
-            <Chart
-              selectedAccounts={selectedAccounts}
-              title="Loan Repayments over time"
-              curveFn={(index:number) => generatePoints(index, 25, 50)}
-              accounts={accounts}
-            />
+                title="Loan Repayments over time"
+                data={loanChartData}
+                xKey="epoch"
+                yKeys={loanChartYKeys}
+              />
           </div>
         </article>
       </div>
