@@ -4,9 +4,21 @@ import { getSimTime, SimTime } from "../utils/time";
 import { getAccountBalance, getCommercialBankAccountNumber, getCommercialBankAccountRefId } from "./accounts.queries";
 import { createTransaction } from "./transactions.queries";
 import { sendNotification } from '../utils/notification';
+import { LoanDetails, LoanPayment, LoanResult, LoanSummary, RepaymentResult, Result, SimpleResult } from "../types/endpoint.types";
+
+
+// TODO: Move to config
+export const MAX_LOANABLE_AMOUNT = 10000; // Max. amount an account can borrow in total across all loans
+export let loanInterestRate = 0.01;     // Interest charged each day on the outstanding loan amount
+
+export const setLoanInterestRate = (rate: number) => {
+  loanInterestRate = rate;
+};
+
 
 export const getLoanIdFromNumber = async (loanNumber: string, t?: ITask<{}>): Promise<number | null> =>
   (await (t ?? db).oneOrNone<{ id: number; }>(`SELECT id FROM loans WHERE loan_number = $1`, [loanNumber]))?.id ?? null;
+
 
 // Get the total amount of money that is still outstanding across all loans for the account
 export const getTotalOutstandingLoansForAccount = async (accountNumber: string, t?: ITask<{}>): Promise<number> =>
@@ -22,6 +34,7 @@ export const getTotalOutstandingLoansForAccount = async (accountNumber: string, 
     WHERE a.account_number = $1
   `, [accountNumber]))?.remaining ?? 0;
 
+
 // Get outstanding repayments for a specific loan number
 export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>): Promise<number> =>
   (await (t ?? db).one(`
@@ -36,31 +49,21 @@ export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>
   `, [loanNumber]))?.outstanding ?? 0;
 
 
-
-// TODO: Move to config
-export const MAX_LOANABLE_AMOUNT = 10000; // Max. amount an account can borrow in total across all loans
-export let LOAN_INTEREST_RATE = 0.01;   // Interest charged each day on the outstanding loan amount
-
-export const setLoanInterestRate = (rate: number) => {
-  LOAN_INTEREST_RATE = rate;
-};
-
 export const createLoan = async (
   accountNumber: string,
   amount: number,
-  interestRate: number = LOAN_INTEREST_RATE
-): Promise<Result<LoanResult>> => {
+  interestRate: number = loanInterestRate
+): Promise<Result<LoanResult, { "invalidLoanAmount": {}, "loanTooLarge": { amount_remaining: number }, "internalError": {} }>> => {
   return db.tx(async t => {
     // Check amount valid
-    if (amount <= 0) return { success: false, error: "invalid_loan_amount" };
+    if (amount <= 0) return { success: false, error: "invalidLoanAmount" };
 
     const remaining = Math.max(0, MAX_LOANABLE_AMOUNT - await getTotalOutstandingLoansForAccount(accountNumber, t));
-    if (amount > remaining) return { success: false, error: "loan_too_large", amount_remaining: remaining };
-
+    if (amount > remaining) return { success: false, error: "loanTooLarge", amount_remaining: remaining };
 
     // Get commercial-bank account no.
     const bankAccNo = await getCommercialBankAccountNumber(t);
-    if (bankAccNo == null) { throw Error("commercial-bank account_ref not found"); }
+    if (bankAccNo == null) return { success: false, error: "internalError" }
 
 
     // Insert transaction
@@ -78,15 +81,13 @@ export const createLoan = async (
     });
 
     // Insert loan
-    const loan = await t.one<LoanResult>(
-      `
+    const loan = await t.one<LoanResult>(`
       INSERT INTO loans (
         loan_number, initial_transaction_id, interest_rate, started_at, write_off
       ) VALUES (
         generate_unique_loan_number(), $1, $2, $3, false
       ) RETURNING loan_number, initial_transaction_id, interest_rate, started_at, write_off
-      `,
-      [ transaction.transaction_id, interestRate, getSimTime() ]
+      `, [ transaction.transaction_id, interestRate, getSimTime() ]
     );
 
     return { success: true, ...loan };
@@ -160,10 +161,10 @@ export const getLoanSummary = async (
 export const getLoanDetails = async (
   loanNumber: string,
   accountNumber: string
-): Promise<Result<LoanDetails>> => {
+): Promise<SimpleResult<LoanDetails, "loanNotFound">> => {
 
   const summary = await getLoanSummary(loanNumber, accountNumber);
-  if (summary == null) return { success: false, error: "loan_not_found" };
+  if (summary == null) return { success: false, error: "loanNotFound" };
 
   const payments = await getLoanPaymentsByNumber(loanNumber);
 
@@ -176,19 +177,19 @@ export const repayLoan = async (
   loanNumber: string,
   accountNumber: string,
   amount: number
-): Promise<Result<RepaymentResult>> => {
-  return db.tx<Result<RepaymentResult>>(async (t) => {
+): Promise<SimpleResult<RepaymentResult, "invalidRepaymentAmount" | "loanNotFound" | "internalError">> => {
+  return db.tx(async (t) => {
 
     // Validate amount
-    if (amount <= 0) return { success: false, error: "invalid_repayment_amount" };
+    if (amount <= 0) return { success: false, error: "invalidRepaymentAmount" };
 
     // Get loan ID
     const loanId = await getLoanIdFromNumber(loanNumber, t);
-    if (loanId == null) return { success: false, error: "loan_not_found" };
+    if (loanId == null) return { success: false, error: "loanNotFound" };
 
     // Get commercial-bank account no.
     const bankAccNo = await getCommercialBankAccountNumber(t);
-    if (bankAccNo == null) { throw Error("commercial-bank account_ref not found"); }
+    if (bankAccNo == null) return { success: false, error: "internalError" };
 
 
     // Get outstanding amount to pay
@@ -305,39 +306,4 @@ export const attemptInstalments = async (
       }
     }
   });
-};
-
-
-export type LoanSummary = {
-  loan_number: string;
-  initial_amount: number;
-  interest_rate: number;
-  started_at: SimTime;
-  write_off: boolean;
-  outstanding_amount: number;
-};
-
-export type LoanPayment = {
-  timestamp: SimTime;
-  amount: number;
-  is_interest: boolean;
-};
-
-export type LoanDetails = LoanSummary & { payments: LoanPayment[] };
-
-type Result<T extends object, E extends object = object> = (
-  ({ success: true } & T) |
-  ({ success: false; error: string; } & E)
-);
-
-interface LoanResult {
-  loan_number: string;
-  initial_transaction_id: number;
-  interest_rate: number;
-  started_at: string;
-  write_off: boolean;
-}
-
-type RepaymentResult = {
-  paid: number;
 };

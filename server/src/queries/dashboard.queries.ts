@@ -1,4 +1,5 @@
 import db from "../config/db.config";
+import { Transaction } from "../types/endpoint.types";
 import { SimTime } from "../utils/time";
 
 
@@ -6,12 +7,12 @@ export const getAllExistingTransactions = async (account: string | undefined): P
   const baseQuery = `
     SELECT 
       t.transaction_number as transaction_number,
-      ts.name AS status,
-      t.amount,
-      t.description,
       from_acc.team_id AS from,
       to_acc.team_id AS to,
-      t.created_at as time
+      t.amount,
+      t.description,
+      ts.name AS status,
+      t.created_at as timestamp
     FROM transactions t
     JOIN transaction_statuses ts ON t.status_id = ts.id
     JOIN account_refs from_ref ON t."from" = from_ref.id
@@ -30,7 +31,7 @@ export const getAllExistingTransactions = async (account: string | undefined): P
   }
 };
 
-export const getAllExistingAccounts = async (): Promise<Accounts[]> => {
+export const getAllExistingAccounts = async (): Promise<AccountInfo[]> => {
   return await db.many(`
     SELECT 
       a.id,
@@ -66,7 +67,7 @@ export const getAllExistingAccounts = async (): Promise<Accounts[]> => {
   `);
 };
 
-export const getAllAccountExpenses = async (accountId: number): Promise<Expenses[]> => {
+export const getAllAccountExpenses = async (accountId: number): Promise<Expense[]> => {
   return await db.manyOrNone(`
     SELECT 
       t.description,
@@ -103,33 +104,23 @@ export const getLoanBalances = async (accountId: number): Promise<LoanBalance> =
   return result ?? { total_outstanding_balance: 0 };
 };
 
-export type Transaction = {
-    transaction_number:string;
-    status:string;
-    amount:number;
-    description:string;
-    from:string;
-    to:string;
-    time:SimTime;
-};
-
 export type loan = {
-    status:string;
-    amount:number;
-    description:string;
-    to:string;
+  status: string;
+  amount: number;
+  description: string;
+  to: string;
 };
 
-export type Accounts = {
-    id:number;
-    account_number:string;
-    name:string;
-    balance: number;
-    income:number;
-    expenses:number;
+export type AccountInfo = {
+  id: number;
+  account_number: string;
+  name: string;
+  balance: number;
+  income: number;
+  expenses: number;
 };
 
-export type Expenses= {
-    description: string;
-    amount:number;
+export type Expense = {
+  description: string;
+  amount:number;
 }

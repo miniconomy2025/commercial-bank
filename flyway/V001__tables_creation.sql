@@ -42,7 +42,7 @@ CREATE TABLE loans (
     loan_number VARCHAR(16) NOT NULL UNIQUE,
     initial_transaction_id INT NOT NULL REFERENCES transactions(id),
     interest_rate NUMERIC(8,5) NOT NULL,
-    started_at NUMERIC(30, 3) NOT NULL,
+    -- started_at NUMERIC(30, 3) NOT NULL,
     write_off BOOLEAN NOT NULL
 );
 

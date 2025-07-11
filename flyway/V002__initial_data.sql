@@ -1,8 +1,9 @@
 ---------- Starter data ----------
 INSERT INTO transaction_statuses (name) VALUES
   ('success'), 
-  ('insufficient_funds'), 
-  ('connection_failed')
+  ('insufficientFunds'), 
+  ('connectionFailed'),
+  ('internalError'),
 ;
 
 INSERT INTO banks (name, team_id) VALUES

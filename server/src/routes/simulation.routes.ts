@@ -1,4 +1,7 @@
-import { Router } from "express";
+// TODO: Add this file to API spec
+// TODO: Add types for request and response in endpoint.types.ts
+
+import { Router, Response } from "express";
 import { snakeToCamelCaseMapper } from "../utils/mapper";
 import { endSimulation, getDateTimeAsISOString, initSimulation } from "../utils/time";
 import { createTransaction } from "../queries/transactions.queries";
@@ -70,7 +73,7 @@ router.post("/end", async (req, res) => {
     }
 });
 
-router.get('/accounts', async (req , res) => {
+router.get('/accounts', async (req, res) => {
   try {
     const accounts = (await getAllExistingAccounts());
     const accountIds = accounts.map((account: any) => account.id);
@@ -79,10 +82,10 @@ router.get('/accounts', async (req , res) => {
       const loanBalance = loanBalances[idx]?.loan_balance || 0;
       return { ...account, loanBalance };
     });
-    res.status(200).json(accountsWithLoanBalance);
+    res.status(200).json({ success: true, accounts: accountsWithLoanBalance });
   } catch (error) {
     logger.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ success: false, error: 'internalError' });
   }
 });
 

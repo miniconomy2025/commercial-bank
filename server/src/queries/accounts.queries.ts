@@ -58,7 +58,7 @@ export const getAccountInformation = async (teamId: string): Promise<AccountInfo
   catch (error: any) { return error.message }
 }
 
-export const getAccountNotificationUrl = async (accountNumber: string): Promise<string | undefined> => {
+export const getAccountNotificationUrl = async (accountNumber: string): Promise<string | null> => {
   const account = await db.oneOrNone(
     `SELECT notification_url FROM accounts WHERE account_number = $1`,
     [accountNumber]
@@ -72,11 +72,3 @@ export const updateAccountNotificationUrl = async (teamId: string, notificationU
     [notificationUrl, teamId]
   );
 };
-
-export const getAccountNotificationUrl = async (accountNumber: string): Promise<string | null> => {
-  const result = await db.oneOrNone<{ notification_url: string }>(
-    `SELECT notification_url FROM accounts WHERE account_number = $1 LIMIT 1`,
-    [accountNumber]
-  );
-  return result?.notification_url ?? null;
-}
