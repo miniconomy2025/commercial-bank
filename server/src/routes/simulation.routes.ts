@@ -5,8 +5,6 @@ import { createTransaction } from "../queries/transactions.queries";
 import { getAccountFromOrganizationUnit } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
 import { attemptInstalments } from "../queries/loans.queries";
-
-import appConfig from "../config/app.config";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 import { setLoanInterestRate } from "../queries/loans.queries";
 
