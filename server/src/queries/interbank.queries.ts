@@ -10,7 +10,7 @@ export const performInterbankTransfer = async (
     description: string,
 ): Promise<InterbankTransferResult> => {
     // Validate amount
-    if (amount <= 0) { return { success: false, error: "unknownRecipientAccount" }; }
+    if (amount <= 0) { return { success: false, error: "invalidAmount" }; }
 
     // Check recipient account exists
     const recipientAccount = await db.oneOrNone(
@@ -36,7 +36,7 @@ export const performInterbankTransfer = async (
         from_account_number,
         amount,
         description,
-        'external-bank', // sender_bank_name
+        'retail-bank', // sender_bank_name
         'commercial-bank', // recipient_bank_name
         transaction_number
     );
@@ -55,7 +55,7 @@ export const performInterbankTransfer = async (
     return { success: true, message: "Transfer recorded successfully" };
 }
 
-export type InterbankTransferError = "unknownRecipientAccount" | "existingTransactionNumber";
+export type InterbankTransferError = "unknownRecipientAccount" | "existingTransactionNumber" | "invalidAmount";
 
 export type InterbankTransferResult = (
     { success: true, message: "Transfer recorded successfully" } |

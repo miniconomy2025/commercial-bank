@@ -39,7 +39,7 @@ export const createAccount = async (
     }
 }
 
-export type AccountInfo = { net_balance: number; account_number: string; };
+export type AccountInfo = { net_balance: number; account_number: string; notification_url: string; };
 export const getAccountInformation = async (teamId: string): Promise<AccountInfo | null> => {
   try {
     const accountInformation = await db.oneOrNone<AccountInfo>(
@@ -56,6 +56,14 @@ export const getAccountInformation = async (teamId: string): Promise<AccountInfo
     return accountInformation;
   }
   catch (error: any) { return error.message }
+}
+
+export const getAccountNotificationUrl = async (accountNumber: string): Promise<string | undefined> => {
+  const account = await db.oneOrNone(
+    `SELECT notification_url FROM accounts WHERE account_number = $1`,
+    [accountNumber]
+  );
+  return account?.notification_url ?? null;
 }
 
 export const updateAccountNotificationUrl = async (teamId: string, notificationUrl: string): Promise<void> => {

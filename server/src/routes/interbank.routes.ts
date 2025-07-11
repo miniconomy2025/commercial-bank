@@ -4,7 +4,11 @@ import { performInterbankTransfer } from '../queries/interbank.queries';
 const router = Router()
 
 // Send money to us from another bank
-router.post("/interbank/transfer", async (req, res) => {
+router.post("/transfer", async (req, res) => {
+  if (req.teamId !== 'retail-bank') {
+    res.status(403).json({ error: "Forbidden: Only retail bank can perform interbank transfers" });
+    return;
+  }
   const { transaction_number, from_account_number, to_account_number, amount, description } = req.body;
 
   if (!transaction_number || !from_account_number || !to_account_number || !amount || !description) {
