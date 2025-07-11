@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import AccountFilter from '../../components/AccountFilter/AccountFilter';
 import Chart from '../../components/LineChart/LineChart';
 import RecentTransactions from '../../components/Transactions/Transactions';
@@ -7,7 +7,7 @@ import type { Account } from '../../types/Accounts';
 import type { Transaction } from '../../types/Transaction';
 import { apiGet } from '../../services/api';
 
- const processBalanceData = (
+const processBalanceData = (
   accounts: Account[],
   selectedAccounts: string[],
   transactions: Transaction[],
@@ -82,24 +82,127 @@ import { apiGet } from '../../services/api';
 const AggregationContent = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [transactions, setTransactions] = useState<any>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // Refs to track polling state and prevent unnecessary re-renders
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTransactionTimeRef = useRef<number>(0);
+  const isInitialLoadRef = useRef(true);
 
-  useEffect(() => {
-    apiGet<Account[]>('/dashboard/accounts')
-      .then((fetchedAccounts) => {
-        setAccounts(fetchedAccounts);
-        setSelectedAccounts(fetchedAccounts.map(acc => acc.id)); // Select all fetched accounts by default
-      })
-      .catch((err) => setError(err.message));
+  // Memoized function to update transactions without causing re-renders
+  const updateTransactions = useCallback((newTransactions: any[]) => {
+    setTransactions(prevTransactions => {
+      // Filter out transactions we already have
+      const existingIds = new Set(prevTransactions.map(t => t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`));
+      const uniqueNewTransactions = newTransactions.filter(t => 
+        !existingIds.has(t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`)
+      );
       
-    apiGet<any[]>('/dashboard/transactions')
-      .then((fetchedTransactions) => {
-        setTransactions(fetchedTransactions);
-      })
-      .catch((err) => setError(err.message));
+      if (uniqueNewTransactions.length === 0) {
+        return prevTransactions; // No new transactions, return same reference
+      }
+      
+      // Update last transaction time
+      const latestTime = Math.max(...newTransactions.map(t => Number(t.time) || 0));
+      lastTransactionTimeRef.current = Math.max(lastTransactionTimeRef.current, latestTime);
+      
+      // Return new array with appended transactions
+      return [...prevTransactions, ...uniqueNewTransactions].sort((a, b) => 
+        (Number(a.time) || 0) - (Number(b.time) || 0)
+      );
+    });
   }, []);
 
+  // Polling function that only fetches new data
+  const pollForUpdates = useCallback(async () => {
+    if (isInitialLoadRef.current) return; // Skip polling during initial load
+
+    try {
+      // Fetch new transactions since last update
+      const fetchedTransactions = await apiGet<any[]>('/dashboard/transactions');
+      
+      // Filter transactions newer than our last known transaction
+      const newTransactions = fetchedTransactions.filter(t => 
+        Number(t.time) > lastTransactionTimeRef.current
+      );
+      
+      if (newTransactions.length > 0) {
+        updateTransactions(newTransactions);
+      }
+      
+      // Optionally check for new accounts (less frequent)
+      // You could make this less frequent by using a counter
+      const fetchedAccounts = await apiGet<Account[]>('/dashboard/accounts');
+      setAccounts(prevAccounts => {
+        const accountIds = new Set(prevAccounts.map(a => a.id));
+        const newAccounts = fetchedAccounts.filter(a => !accountIds.has(a.id));
+        
+        if (newAccounts.length === 0) {
+          return prevAccounts; // No new accounts, return same reference
+        }
+        
+        // Auto-select new accounts
+        setSelectedAccounts(prev => [...prev, ...newAccounts.map(a => a.id)]);
+        return [...prevAccounts, ...newAccounts];
+      });
+      
+    } catch (err: any) {
+      console.error('Polling error:', err);
+      // Don't update error state to avoid re-renders, just log
+    }
+  }, [updateTransactions]);
+
+  // Initial data fetch
+  useEffect(() => {
+    const initialFetch = async () => {
+      try {
+        const [fetchedAccounts, fetchedTransactions] = await Promise.all([
+          apiGet<Account[]>('/dashboard/accounts'),
+          apiGet<any[]>('/dashboard/transactions')
+        ]);
+        
+        setAccounts(fetchedAccounts);
+        setSelectedAccounts(fetchedAccounts.map(acc => acc.id));
+        setTransactions(fetchedTransactions);
+        
+        // Update last transaction time
+        if (fetchedTransactions.length > 0) {
+          lastTransactionTimeRef.current = Math.max(...fetchedTransactions.map(t => Number(t.time) || 0));
+        }
+        
+        isInitialLoadRef.current = false;
+      } catch (err: any) {
+        setError(err.message);
+        isInitialLoadRef.current = false;
+      }
+    };
+
+    initialFetch();
+  }, []);
+
+  // Setup polling
+  useEffect(() => {
+    if (isInitialLoadRef.current) return; // Don't start polling until initial load is complete
+
+    // Start polling every 5 seconds (adjust as needed)
+    pollingIntervalRef.current = setInterval(pollForUpdates, 5000);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [pollForUpdates]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleAccountToggle = (accountId: string) => {
     setSelectedAccounts(prev =>
