@@ -11,9 +11,9 @@ BEGIN
         DROP VIEW IF EXISTS loan_payment_summary;
         
         ALTER TABLE loans 
-        ALTER COLUMN started_at TYPE NUMERIC(30, 2);
+        ALTER COLUMN started_at TYPE NUMERIC(60, 2);
 		ALTER TABLE transactions 
-        ALTER COLUMN created_at TYPE NUMERIC(30, 2);
+        ALTER COLUMN created_at TYPE NUMERIC(60, 2);
         
 		CREATE OR REPLACE VIEW loan_status AS
 		SELECT
