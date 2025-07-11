@@ -1,5 +1,6 @@
 import db from "../config/db.config";
 import { createTransaction } from "./transactions.queries";
+import { sendNotification } from '../utils/notification';
 
 export const performInterbankTransfer = async (
     transaction_number: string,
@@ -30,7 +31,7 @@ export const performInterbankTransfer = async (
     }
 
     // Insert transaction using createTransaction
-    await createTransaction(
+    const transaction = await createTransaction(
         to_account_number,
         from_account_number,
         amount,
@@ -39,6 +40,17 @@ export const performInterbankTransfer = async (
         'commercial-bank', // recipient_bank_name
         transaction_number
     );
+
+    // Send notification to recipient
+    await sendNotification(to_account_number, {
+      transaction_number: transaction.transaction_number,
+      status: transaction.status || 'success',
+      amount: amount,
+      timestamp: Date.now(),
+      description,
+      from: from_account_number,
+      to: to_account_number
+    });
 
     return { success: true, message: "Transfer recorded successfully" };
 }

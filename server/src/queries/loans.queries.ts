@@ -3,6 +3,7 @@ import db from "../config/db.config";
 import { getSimTime, SimTime } from "../utils/time";
 import { getAccountBalance, getCommercialBankAccountNumber, getCommercialBankAccountRefId } from "./accounts.queries";
 import { createTransaction } from "./transactions.queries";
+import { sendNotification } from '../utils/notification';
 
 export const getLoanIdFromNumber = async (loanNumber: string, t?: ITask<{}>): Promise<number | null> =>
   (await (t ?? db).oneOrNone<{ id: number; }>(`SELECT id FROM loans WHERE loan_number = $1`, [loanNumber]))?.id ?? null;
@@ -64,6 +65,17 @@ export const createLoan = async (
 
     // Insert transaction
     const transaction = await createTransaction(accountNumber, bankAccNo, amount, `Loan disbursement to ${accountNumber}`);
+
+    // Send notification to recipient
+    await sendNotification(accountNumber, {
+      transaction_number: transaction.transaction_number,
+      status: transaction.status || 'success',
+      amount: amount,
+      timestamp: Number(getSimTime()),
+      description: `Loan disbursement to ${accountNumber}`,
+      from: bankAccNo,
+      to: accountNumber
+    });
 
     // Insert loan
     const loan = await t.one<LoanResult>(
@@ -186,6 +198,17 @@ export const repayLoan = async (
 
     // Create repayment transaction
     const transaction = await createTransaction(bankAccNo, accountNumber, repayment, `Repayment of loan ${loanNumber}`);
+
+    // Send notification to recipient
+    await sendNotification(accountNumber, {
+      transaction_number: transaction.transaction_number,
+      status: transaction.status || 'success',
+      amount: repayment,
+      timestamp: Number(getSimTime()),
+      description: `Repayment of loan ${loanNumber}`,
+      from: bankAccNo,
+      to: accountNumber
+    });
 
     // Link repayment to the loan
     await t.none(`

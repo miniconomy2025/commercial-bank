@@ -52,7 +52,7 @@ export const getAccountInformation = async (teamId: string): Promise<AccountInfo
       WHERE accounts.team_id = $1
       GROUP BY accounts.id, accounts.account_number;`,
       [teamId]
-    )
+    );
     return accountInformation;
   }
   catch (error: any) { return error.message }
@@ -64,3 +64,11 @@ export const updateAccountNotificationUrl = async (teamId: string, notificationU
     [notificationUrl, teamId]
   );
 };
+
+export const getAccountNotificationUrl = async (accountNumber: string): Promise<string | null> => {
+  const result = await db.oneOrNone<{ notification_url: string }>(
+    `SELECT notification_url FROM accounts WHERE account_number = $1 LIMIT 1`,
+    [accountNumber]
+  );
+  return result?.notification_url ?? null;
+}

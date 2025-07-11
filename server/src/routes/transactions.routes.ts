@@ -41,6 +41,15 @@ router.post("/", async (req, res) => {
     }
   }
 
+  // Validate required fields
+  if (amount <= 0) {
+    res.status(400).json({ error: "Amount must be greater than 0" }); return;
+  }
+
+  if (!to_account_number || !to_bank_name || !description) {
+    res.status(400).json({ error: "All fields are required" }); return;
+  }
+
   try {
 
     switch(to_bank_name.toLowerCase()) {

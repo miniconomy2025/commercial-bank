@@ -79,8 +79,8 @@ router.get("/:loan_number", async (req, res) => {
   }
 });
 
-//update the prime rate
-//NOTE: oly the hand can update this
+// Update the prime rate
+// NOTE: only the hand can update this
 router.post("/prime_rate",async (req,res) =>{
   const teamId = req.teamId
   const {prime_rate} = req.body;
