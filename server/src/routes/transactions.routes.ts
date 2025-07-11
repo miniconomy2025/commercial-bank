@@ -5,6 +5,7 @@ import { HttpClient } from '../utils/http-client';
 import { Account } from '../types/account.type';
 import { getAccountFromOrganizationUnit } from '../queries/auth.queries';
 import { getAccountInformation, getAccountNotificationUrl } from '../queries/accounts.queries';
+import appConfig from '../config/app.config';
 
 const router = Router()
 
@@ -35,7 +36,7 @@ function isValidUrl(urlString?: string): boolean {
 
 
 router.post("/", async (req, res) => {
-  const { to_account_number, amount, description } = req.body;
+  const { to_account_number, amount, description, to_bank_name } = req.body;
   const from_account_number = req.account!.accountNumber;
   if (from_account_number  === to_account_number){
     res.status(400).json({ error: "Cant send money to yourself" });
@@ -52,31 +53,61 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    const newTransaction = await createTransaction(
-      to_account_number,
-      from_account_number,
-      amount,
-      description
-    );
+    let newTransaction;
+    if (to_bank_name) {
+      newTransaction = await createTransaction(
+        to_account_number,
+        from_account_number,
+        amount,
+        description,
+        'commercial-bank',
+        'thoh'
+      );
+    } else {
+      newTransaction = await createTransaction(
+        to_account_number,
+        from_account_number,
+        amount,
+        description
+      );
+    }
     if (!newTransaction) {
       res.status(400).json({ error: "Invalid transaction data" });
       return;
     }
-    const notificationUrl = await getAccountNotificationUrl(to_account_number);
-    if (isValidUrl(notificationUrl)) {
-      httpClient.post(notificationUrl!, {
-        transaction_number: newTransaction.transaction_number,
-        status: "SUCCESS",
-        amount,
-        description
-      }).subscribe({
-        next: (response) => {
-          console.log("Notification sent successfully:", response);
-        },
-        error: (error) => {
-          console.log("Error sending notification:", error);
-        }
-      });
+    if (to_bank_name){
+      switch (to_bank_name) {
+        case 'thoh': httpClient.post(`${appConfig.thohHost}/orders/payments`, {
+          transaction_number: newTransaction.transaction_number,
+          status: "SUCCESS",
+          amount,
+          description
+        }).subscribe({
+          next: (response) => {
+            logger.info("Notification sent successfully:", response);
+          },
+          error: (error) => {
+            logger.info("Error sending notification:", error);
+          }
+        }); break;
+      }
+    } else {
+      const notificationUrl = await getAccountNotificationUrl(to_account_number);
+      if (isValidUrl(notificationUrl)) {
+        httpClient.post(notificationUrl!, {
+          transaction_number: newTransaction.transaction_number,
+          status: "SUCCESS",
+          amount,
+          description
+        }).subscribe({
+          next: (response) => {
+            logger.info("Notification sent successfully:", response);
+          },
+          error: (error) => {
+            logger.info("Error sending notification:", error);
+          }
+        });
+      }
     }
     res.status(200).json(newTransaction);
   } catch (error) {
