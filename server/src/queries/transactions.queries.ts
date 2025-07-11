@@ -35,37 +35,63 @@ export const getTransactionStatusId = async (statusName: string): Promise<number
 
 // TODO: Validate amount > 0
 export const createTransaction = async (
-    recipient_account_number: string,
-    sender_account_number: string,
-    amount: number,
-    description: string,
-    sender_bank_name: string = 'commercial-bank',
-    recipient_bank_name: string = 'commercial-bank',
-    transactionNumber?: string
-  )
-: Promise<CreateTransactionResult> => {
+  recipient_account_number: string,
+  sender_account_number: string,
+  amount: number,
+  description: string,
+  sender_bank_name: string = 'commercial-bank',
+  recipient_bank_name: string = 'commercial-bank',
+  transactionNumber?: string
+): Promise<CreateTransactionResult> => {  
+  const statusId = await validateTransaction(sender_account_number, sender_bank_name, amount);// 1 for success, 2 for failed
+  
   return db.one(
-  `WITH
+    `WITH
       inserted AS (
         INSERT INTO transactions (transaction_number, "from", "to", amount, description, status_id, created_at)
         VALUES (
           COALESCE($8, generate_unique_transaction_number()),
           get_or_create_account_ref_id($1, $2),
           get_or_create_account_ref_id($3, $4),
-          $5, $6, 1, $7
+          $5, $6, $9, $7
         )
         RETURNING id AS transaction_id, transaction_number, status_id
     )
-  SELECT 
-      i.transaction_id,
-      i.transaction_number,
-      s.name AS status_string
-  FROM inserted i
-  JOIN transaction_statuses s ON s.id = i.status_id;
-  `,
-    [sender_account_number, sender_bank_name, recipient_account_number, recipient_bank_name, amount, description, getSimTime(), transactionNumber ?? null]
+    SELECT 
+        i.transaction_id,
+        i.transaction_number,
+        s.name AS status_string
+    FROM inserted i
+    JOIN transaction_statuses s ON s.id = i.status_id;
+    `,
+    [sender_account_number, sender_bank_name, recipient_account_number, recipient_bank_name, amount, description, getSimTime(), transactionNumber ?? null, statusId]
   );
-}
+};
+
+const validateTransaction = async (
+  sender_account_number: string,
+  sender_bank_name: string,
+  amount: number
+): Promise<number> => {
+  try {
+    const account = await db.oneOrNone(
+      `SELECT balance FROM accounts WHERE account_number = $1 AND bank_name = $2`,
+      [sender_account_number, sender_bank_name]
+    );
+    
+    if (!account ) {
+      return 3; 
+    }
+    
+    if (account.balance < amount) {
+      return 2;
+    }
+    
+    return 1;
+  } catch (error) {
+    return 3;
+  }
+};
 
 export const getTransactionById = async (id: string): Promise<Transaction | null> => {
   return db.oneOrNone(`SELECT
