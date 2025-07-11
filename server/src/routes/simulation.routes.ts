@@ -7,8 +7,12 @@ import { logger } from "../utils/logger";
 import { attemptInstalments } from "../queries/loans.queries";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 import { setLoanInterestRate } from "../queries/loans.queries";
+import { HttpClient } from "../utils/http-client";
+import { retry } from "rxjs";
+import { resetDB } from "../queries/simulation.queries";
 
 const router = Router();
+const httpClient = new HttpClient();
 
 function onEachDay() {
     attemptInstalments();
@@ -32,6 +36,8 @@ router.post("/start", async (req, res) => {
             return;
         }
 
+        resetDB(startingTime);
+
         setLoanInterestRate(Number(prime_rate))
         const fromAccountNumber = await getAccountFromOrganizationUnit('thoh').then(account => account?.accountNumber);
         initSimulation(startingTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
@@ -40,7 +46,7 @@ router.post("/start", async (req, res) => {
             res.status(404).json({ error: "Commercial bank account not found" });
             return;
         }
-        await createTransaction(fromAccountNumber!, toAccountNumber, initial_bank_balance, `Simulation start with balance ${initial_bank_balance}`, 'thoh', 'commercial-bank')
+        await createTransaction(fromAccountNumber!, toAccountNumber, initial_bank_balance, `Simulation start with balance ${initial_bank_balance}`, 'thoh', 'commercial-bank');
         res.status(200).send(getDateTimeAsISOString());
     } catch (error) {
         logger.error("Error starting simulation:", error);
@@ -48,16 +54,23 @@ router.post("/start", async (req, res) => {
     }
 });
 
-const getStartingBalance = async (): Promise<{prime_rate:number,initial_bank_balance:number} | null> => {
+const getStartingBalance = async (): Promise<{prime_rate:number,initial_bank_balance:number} | undefined> => {
   try {
-    const response = await fetch('https://thoh-api.projects.bbdgrad.com/api/bank/initialization');
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-    const data = await response.json();
-    return (data) || null;
+    httpClient.get('https://thoh-api.projects.bbdgrad.com/api/bank/initialization').pipe(
+        retry(3) // Retry up to 3 times on failure
+    ).subscribe({
+        next: (data) => {
+            return data
+        },
+        error: (error) => {
+            console.log('Error fetching starting balance:', error);
+            return undefined;
+        },
+    });
+    return undefined;
   } catch (error) {
-    console.error('Error fetching starting balance:', error);
-    return null;
+    console.log('Error fetching starting balance:', error);
+    return undefined;
   }
 };
 
