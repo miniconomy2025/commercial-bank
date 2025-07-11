@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import RecentTransactions from '../../components/Transactions/Transactions';
 import AccountSelector from '../../components/AccountSelector/AccountSelector';
 import PieChart from '../../components/PieChart/PieChart';
@@ -47,7 +47,6 @@ const processLoanRepayments = (loans: any[]) => {
   return { data, yKeys };
 };
 
-
 const IndividualAccountContent = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -57,41 +56,189 @@ const IndividualAccountContent = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
 
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTransactionTimeRef = useRef<number>(0);
+  const isInitialLoadRef = useRef(true);
+  const currentAccountRef = useRef<string | null>(null);
+
   const selectedAccount = accounts.find(acc => selectedAccounts.includes(acc.id)) || accounts[0];
 
+  const updateTransactions = useCallback((newTransactions: any[]) => {
+    setTransactions(prevTransactions => {
+      const existingIds = new Set(prevTransactions.map(t => t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`));
+      const uniqueNewTransactions = newTransactions.filter(t => 
+        !existingIds.has(t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`)
+      );
+      
+      if (uniqueNewTransactions.length === 0) {
+        return prevTransactions; // No new transactions, return same reference
+      }
+      
+      // Update last transaction time
+      const latestTime = Math.max(...newTransactions.map(t => Number(t.time) || 0));
+      lastTransactionTimeRef.current = Math.max(lastTransactionTimeRef.current, latestTime);
+      
+      // Return new array with appended transactions
+      return [...prevTransactions, ...uniqueNewTransactions].sort((a, b) => 
+        (Number(a.time) || 0) - (Number(b.time) || 0)
+      );
+    });
+  }, []);
+
+  // Memoized function to update loans without causing re-renders
+  const updateLoans = useCallback((newLoans: any[]) => {
+    setLoans(prevLoans => {
+      // Check if there are any changes in loan data
+      const loansChanged = newLoans.some(newLoan => {
+        const existingLoan = prevLoans.find(l => l.loan_number === newLoan.loan_number);
+        return !existingLoan || 
+               existingLoan.outstanding_amount !== newLoan.outstanding_amount ||
+               existingLoan.initial_amount !== newLoan.initial_amount;
+      });
+
+      if (!loansChanged && newLoans.length === prevLoans.length) {
+        return prevLoans; // No changes, return same reference
+      }
+
+      return newLoans;
+    });
+  }, []);
+
+  // Memoized function to update accounts without causing re-renders
+  const updateAccounts = useCallback((newAccounts: Account[]) => {
+    setAccounts(prevAccounts => {
+      // Check if there are any changes in account data
+      const accountsChanged = newAccounts.some(newAccount => {
+        const existingAccount = prevAccounts.find(a => a.id === newAccount.id);
+        return !existingAccount || 
+               existingAccount.balance !== newAccount.balance ||
+               existingAccount.loanBalance !== newAccount.loanBalance ||
+               existingAccount.income !== newAccount.income ||
+               existingAccount.expenses !== newAccount.expenses;
+      });
+
+      if (!accountsChanged && newAccounts.length === prevAccounts.length) {
+        return prevAccounts; // No changes, return same reference
+      }
+
+      return newAccounts;
+    });
+  }, []);
+
+  // Polling function that only fetches new data
+  const pollForUpdates = useCallback(async () => {
+    if (isInitialLoadRef.current || !selectedAccount) return;
+
+    try {
+      // Fetch new transactions for current account since last update
+      const fetchedTransactions = await apiGet<any[]>(`/dashboard/transactions?account=${selectedAccount.name}`);
+      
+      // Filter transactions newer than our last known transaction
+      const newTransactions = fetchedTransactions.filter(t => 
+        Number(t.time) > lastTransactionTimeRef.current
+      );
+      
+      if (newTransactions.length > 0) {
+        updateTransactions(newTransactions);
+      }
+      
+      // Update loans data (check for changes in outstanding amounts)
+      const fetchedLoans = await apiGet<any[]>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`);
+      updateLoans(fetchedLoans);
+      
+      // Update accounts data (balances might have changed)
+      const fetchedAccounts = await apiGet<Account[]>('/dashboard/accounts');
+      updateAccounts(fetchedAccounts);
+      
+    } catch (err: any) {
+      console.error('Polling error:', err);
+      // Don't update error state to avoid re-renders, just log
+    }
+  }, [selectedAccount, updateTransactions, updateLoans, updateAccounts]);
+
+  // Initial accounts fetch
   useEffect(() => {
-    setIsLoading(true);
-    apiGet<Account[]>('/dashboard/accounts')
-      .then((fetchedAccounts) => {
+    const initialFetch = async () => {
+      try {
+        setIsLoading(true);
+        const fetchedAccounts = await apiGet<Account[]>('/dashboard/accounts');
         setAccounts(fetchedAccounts);
+        
         if (fetchedAccounts.length > 0) {
           setSelectedAccounts([fetchedAccounts[0].id]);
         }
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setIsLoading(false));
+        
+        isInitialLoadRef.current = false;
+      } catch (err: any) {
+        setError(err.message);
+        isInitialLoadRef.current = false;
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialFetch();
   }, []);
 
+  // Fetch transactions and loans when account changes
   useEffect(() => {
     if (!selectedAccount) return;
 
-    setIsTransactionsLoading(true);
-    apiGet<any[]>(`/dashboard/transactions?account=${selectedAccount.name}`)
-      .then((fetchedTransactions) => {
+    const fetchAccountData = async () => {
+      try {
+        setIsTransactionsLoading(true);
+        currentAccountRef.current = selectedAccount.id;
+        
+        const [fetchedTransactions, fetchedLoans] = await Promise.all([
+          apiGet<any[]>(`/dashboard/transactions?account=${selectedAccount.name}`),
+          apiGet<any[]>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`)
+        ]);
+        
         setTransactions(fetchedTransactions);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setIsTransactionsLoading(false));
+        setLoans(fetchedLoans);
+        
+        // Update last transaction time
+        if (fetchedTransactions.length > 0) {
+          lastTransactionTimeRef.current = Math.max(...fetchedTransactions.map(t => Number(t.time) || 0));
+        }
+        
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsTransactionsLoading(false);
+      }
+    };
+
+    fetchAccountData();
   }, [selectedAccount]);
 
+  // Setup polling
   useEffect(() => {
-    if (!selectedAccount) return;
-    apiGet<any[]>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`)
-      .then((fetchedLoans) => {
-        setLoans(fetchedLoans);
-      })
-      .catch((err) => setError(err.message));
-  }, [selectedAccount]);
+    if (isInitialLoadRef.current || !selectedAccount) return;
+
+    // Clear existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    // Start polling every 5 seconds (adjust as needed)
+    pollingIntervalRef.current = setInterval(pollForUpdates, 5000);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [pollForUpdates, selectedAccount]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const { data: loanChartData, yKeys: loanChartYKeys } = processLoanRepayments(loans);
 
