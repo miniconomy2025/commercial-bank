@@ -37,6 +37,10 @@ function isValidUrl(urlString?: string): boolean {
 router.post("/", async (req, res) => {
   const { to_account_number, amount, description } = req.body;
   const from_account_number = req.account!.accountNumber;
+  if (from_account_number  === to_account_number){
+    res.status(400).json({ error: "Cant send money to yourself" });
+    return;
+  }
 
   try {
     const newTransaction = await createTransaction(
