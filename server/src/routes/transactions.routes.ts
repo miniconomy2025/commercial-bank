@@ -43,6 +43,15 @@ router.post("/", async (req, res) => {
     return;
   }
 
+  if (amount <= 0) {
+    res.status(400).json({ error: "Invalid amount specified" });
+    return;
+  }
+  if (!to_account_number || !amount || !description) {
+    res.status(400).json({ error: "Missing required fields: to_account_number, amount, description" });
+    return;
+  }
+
   try {
     let newTransaction;
     if (to_bank_name) {
