@@ -32,7 +32,7 @@ router.post("/", async (req, res) => {
           return;
         }
 
-        const { initial_bank_balance, prime_rate } = balanceData;
+        const { investment_value, prime_rate } = balanceData;
 
         if (!epochStartTime ) {
             res.status(400).json({ error: "Bad Request: Missing required fields: starting_time, starting_balance, from_account_number" });
@@ -49,7 +49,7 @@ router.post("/", async (req, res) => {
             res.status(404).json({ error: "Commercial bank account not found" });
             return;
         }
-        await createTransaction(fromAccountNumber!, toAccountNumber, initial_bank_balance, `Simulation start with balance ${initial_bank_balance}`, 'thoh', 'commercial-bank');
+        await createTransaction(fromAccountNumber!, toAccountNumber, investment_value, `Simulation start with balance ${investment_value}`, 'thoh', 'commercial-bank');
         res.status(200).send(getDateTimeAsISOString());
     } catch (error) {
         logger.error("Error starting simulation:", error);
@@ -57,7 +57,7 @@ router.post("/", async (req, res) => {
     }
 });
 
-const getStartingBalance = async (): Promise<{prime_rate:number,initial_bank_balance:number} | undefined> => {
+const getStartingBalance = async (): Promise<{prime_rate:number, investment_value:number} | undefined> => {
   try {
     httpClient.get('https://thoh-api.projects.bbdgrad.com/api/bank/initialization').pipe(
         retry(3) // Retry up to 3 times on failure

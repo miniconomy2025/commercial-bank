@@ -26,6 +26,7 @@ const appConfig = {
   thohHost: process.env.THOH_HOST || 'https://localhost:8443',
   clientId: process.env.CLIENT_ID,
   thohTeamId: 'thoh',
+  thohAccountNumber: '000000000000',
 };
 
 export default appConfig;
