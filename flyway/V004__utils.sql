@@ -17,12 +17,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Get account_number & callback_url from team ID
+-- Get account_number & notification_url from team ID
 CREATE OR REPLACE FUNCTION get_account_details_from_team_id(p_team_id VARCHAR)
-RETURNS TABLE(account_number VARCHAR, callback_url VARCHAR) AS $$
+RETURNS TABLE(account_number VARCHAR, notification_url VARCHAR) AS $$
 BEGIN
     RETURN QUERY
-    SELECT account_number, callback_url FROM accounts WHERE team_id = p_team_id;
+    SELECT account_number, notification_url FROM accounts WHERE team_id = p_team_id;
 END;
 $$ LANGUAGE plpgsql;
 

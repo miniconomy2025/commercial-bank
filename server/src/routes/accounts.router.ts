@@ -43,15 +43,15 @@ router.get('/', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<Ge
 router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Post_Account_Res>) => {
   try {
     const createdAt = getSimTime();
-    const { callbackURL } = req.body;
+    const { notification_url } = req.body;
     const teamId = req.teamId;
 
-    if (!callbackURL) {
+    if (!notification_url) {
       res.status(400).json({ success: false, error: 'invalidPayload' });
       return;
     }
 
-    const newAccount = await createAccount(createdAt, callbackURL, teamId ?? '');
+    const newAccount = await createAccount(createdAt, notification_url, teamId ?? '');
 
     if (!newAccount.success && newAccount.error === 'accountAlreadyExists') {
       logger.info(`Account already exists for team ID: ${teamId}`);

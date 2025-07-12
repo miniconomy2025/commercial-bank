@@ -23,7 +23,7 @@ export type BankId = "commercial-bank" | "retail-bank" | "thoh";
 //-------------------- /account --------------------//
 
 // POST /account
-export type Post_Account_Req = { callbackURL?: string; };
+export type Post_Account_Req = { notification_url?: string; };
 export type Post_Account_Res = SimpleResult<
     { account_number: string },
     "invalidPayload" | "accountAlreadyExists" | "internalError"
