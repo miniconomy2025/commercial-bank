@@ -3,7 +3,7 @@ INSERT INTO transaction_statuses (name) VALUES
   ('success'), 
   ('insufficientFunds'), 
   ('connectionFailed'),
-  ('internalError'),
+  ('internalError')
 ;
 
 INSERT INTO banks (name, team_id) VALUES
