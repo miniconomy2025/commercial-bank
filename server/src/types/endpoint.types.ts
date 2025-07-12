@@ -10,11 +10,11 @@ export type Result<
     Es extends string = keyof E extends string ? keyof E : never    // Possible error strings
 > = (
     ({ success: true } & S) |
-    ({ success: false; error: Es } & E[Es])
+    ({ [K in keyof E]: { success: false; error: K } & E[K] }[Es])
 );
 
 // Simple result, no error payload
-export type SimpleResult<S extends object, Es extends string> = Result<S, {}, Es>;
+export type SimpleResult<S extends object, Es extends string> = Result<S, { [K in Es]: {} }>;
 
 //-------------------- Generic Base Types --------------------//
 export type BankId = "commercial-bank" | "retail-bank" | "thoh";
@@ -91,7 +91,7 @@ export type Post_Transaction_Req = {
 };
 export type Post_Transaction_Res = SimpleResult<
     { transaction_number: string; status: string },
-    "invalidPayload" | "accountNotFound" | "transactionNumberAlreadyExists" | "insufficientFunds" | "internalError"
+    "invalidPayload" | "accountNotFound" | "transactionNumberAlreadyExists" | "insufficientFunds" | "accountFrozen" | "internalError"
 >;
 
 // GET /transaction
@@ -141,9 +141,9 @@ export type RepaymentResult = { paid: number; };
 
 // POST /loan
 export type Post_Loan_Req = { amount: number; };
-export type Post_Loan_Res = SimpleResult<
+export type Post_Loan_Res = Result<
     { loan_number: string },
-    "invalidPayload" | "loanNotPermitted" | "internalError"
+    { "invalidLoanAmount": {}, "loanNotPermitted": {}, "loanTooLarge": { amount_remaining: number }, "accountNotFound": {}, "internalError": {} }
 >;
 
 // GET /loan
@@ -157,22 +157,13 @@ export type Get_Loan_Res = SimpleResult<
 export type Post_LoanNumberPay_Req = { amount: number; };
 export type Post_LoanNumberPay_Res = SimpleResult<
     RepaymentResult,
-    "invalidPayload" | "loanNotFound" | "loanPaidOff" | "loanWrittenOff" | "paymentNotPermitted" | "internalError"
+    "invalidPayload" | "invalidRepaymentAmount" | "loanNotFound" | "loanPaidOff" | "loanWrittenOff" | "paymentNotPermitted" | "accountNotFound" | "internalError"
 >;
 
 // GET /loan/{loan_number}
 export type Get_LoanNumber_Req = {};
 export type Get_LoanNumber_Res = SimpleResult<
-  {
-    loan: {
-      loan_number: string;
-      initial_amount: number;
-      outstanding_amount: number;
-      interest_rate: number;
-      write_off: boolean;
-      payments: LoanPayment[];
-    };
-  },
+  { loan: LoanDetails; },
   "loanNotFound" | "internalError"
 >;
 

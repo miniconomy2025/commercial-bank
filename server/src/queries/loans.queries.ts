@@ -48,7 +48,6 @@ export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>
     GROUP BY init_tx.amount
   `, [loanNumber]))?.outstanding ?? 0;
 
-
 export const createLoan = async (
   accountNumber: string,
   amount: number,
@@ -65,9 +64,18 @@ export const createLoan = async (
     const bankAccNo = await getCommercialBankAccountNumber(t);
     if (bankAccNo == null) return { success: false, error: "internalError" }
 
-
     // Insert transaction
     const transaction = await createTransaction(accountNumber, bankAccNo, amount, `Loan disbursement to ${accountNumber}`);
+
+    // Insert loan
+    const loan = await t.one<LoanResult>(`
+      INSERT INTO loans (
+        loan_number, initial_transaction_id, interest_rate, started_at, write_off
+      ) VALUES (
+        generate_unique_loan_number(), $1, $2, $3, false
+      ) RETURNING loan_number, initial_transaction_id, interest_rate, started_at, write_off
+      `, [ transaction.transaction_id, interestRate, getSimTime() ]
+    );
 
     // Send notification to recipient
     await sendNotification(accountNumber, {
@@ -79,16 +87,6 @@ export const createLoan = async (
       from: bankAccNo,
       to: accountNumber
     });
-
-    // Insert loan
-    const loan = await t.one<LoanResult>(`
-      INSERT INTO loans (
-        loan_number, initial_transaction_id, interest_rate, started_at, write_off
-      ) VALUES (
-        generate_unique_loan_number(), $1, $2, $3, false
-      ) RETURNING loan_number, initial_transaction_id, interest_rate, started_at, write_off
-      `, [ transaction.transaction_id, interestRate, getSimTime() ]
-    );
 
     return { success: true, ...loan };
   });

@@ -1,5 +1,6 @@
 import { ITask } from "pg-promise";
 import db from "../config/db.config";
+import { Post_Account_Res } from "../types/endpoint.types";
 
 export const getCommercialBankAccountRefId = async (t?: ITask<{}>): Promise<number | null> =>
   (await (t ?? db).oneOrNone(`SELECT id FROM account_refs WHERE team_id = 'commercial-bank' LIMIT 1`))?.id ?? null;
@@ -19,23 +20,24 @@ export const doesAccountExist = async (teamId: string): Promise<boolean> => {
 export const getAccountBalance = async (accountNumber: string, t?: ITask<{}>): Promise<number | null> =>
   (await (t ?? db).oneOrNone(`SELECT * FROM get_account_balance($1) AS balance`, [accountNumber]))?.balance ?? null;
 
-export interface CreateAccountResult { account_number: string; }
-
 export const createAccount = async (
     createdAt: number,
     notificationUrl: string,
     teamId: string
-): Promise<CreateAccountResult> => {
+): Promise<Post_Account_Res> => {
     try {
         const result = await db.oneOrNone<{ create_account: string }>(
           'SELECT create_account($1, $2, $3)',
           [createdAt, notificationUrl, teamId]
         );
-        
-        return result ? { account_number: result.create_account } : { account_number: "" };
+        if (!result || !result.create_account) {
+          return { success: false, error: "internalError" };
+        }
+
+        return { success: true, account_number: result.create_account };
     } catch (error) {
         console.error('Error creating account:', error);
-        throw error;
+        return { success: false, error: "internalError" };
     }
 }
 

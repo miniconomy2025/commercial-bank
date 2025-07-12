@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
-import { createLoan, getLoanDetails, getLoanSummariesForAccount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
+import { createLoan, getLoanDetails, getLoanIdFromNumber, getLoanSummariesForAccount, getOutstandingLoanAmount, getTotalOutstandingLoansForAccount, MAX_LOANABLE_AMOUNT, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
 import { logger } from '../utils/logger';
 import { snakeToCamelCaseMapper } from '../utils/mapper';
 import {
@@ -12,6 +12,7 @@ import {
   Get_LoanNumber_Res,
   Get_Loan_Req
 } from '../types/endpoint.types';
+import db from '../config/db.config';
 
 //=============== /loan ==============//
 
@@ -21,13 +22,42 @@ const router = Router()
 router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_Loan_Res>) => {
   const { amount } = req.body;
   const borrowerAccNo = req.account!.accountNumber;
-  if (!amount || isNaN(amount) || amount <= 0) {
-    res.status(400).json({ success: false, error: "invalidPayload" });
+
+  // Validation: amount >= 0
+  if (!amount || isNaN(amount) || amount < 0) {
+    res.status(400).json({ success: false, error: "invalidLoanAmount" });
+    return;
+  }
+  // Validation: account exists
+  const accountExists = await db.oneOrNone('SELECT 1 FROM accounts WHERE account_number = $1', [borrowerAccNo]);
+  if (!accountExists) {
+    res.status(404).json({ success: false, error: "accountNotFound" });
+    return;
+  }
+  // Validation: account not frozen
+  const frozenStatus = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [borrowerAccNo]);
+  if (frozenStatus?.frozen) {
+    res.status(422).json({ success: false, error: "loanNotPermitted" });
+    return;
+  }
+  // Validation: loan permitted by outstanding loans and bank funds
+  const outstandingLoans = await getTotalOutstandingLoansForAccount(borrowerAccNo);
+  if (outstandingLoans + amount > MAX_LOANABLE_AMOUNT) {
+    res.status(422).json({ success: false, error: "loanNotPermitted" });
     return;
   }
   try {
     const loanResult = await createLoan(borrowerAccNo, amount);
-    res.status(200).json(loanResult);
+    if (loanResult.success) {
+      res.status(200).json({ success: true, loan_number: loanResult.loan_number });
+    } else if (loanResult.error === "invalidLoanAmount") {
+      res.status(400).json({ success: false, error: "invalidLoanAmount" });
+    } else if (loanResult.error === "loanTooLarge") {
+      const { amount_remaining } = loanResult;
+      res.status(422).json({ success: false, error: "loanTooLarge", amount_remaining: loanResult.amount_remaining });
+    } else {
+      res.status(500).json({ success: false, error: "internalError" });
+    }
   }
   catch (error) {
     logger.error("Error creating loan:", error);
@@ -54,6 +84,7 @@ router.get("/", async (req: Request<{}, {}, Get_Loan_Req>, res: Response<Get_Loa
 
 // Repay loan
 // NOTE: Any account can contribute to the repayment of a loan on any other account
+// FIX: Add full validation for loan repayment
 router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }, {}, Post_LoanNumberPay_Req>, res: Response<Post_LoanNumberPay_Res>) => {
   const { amount } = req.body;
   if (!amount || isNaN(amount) || amount <= 0) {
@@ -62,7 +93,29 @@ router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }, {}
   }
   const { loan_number } = req.params;
   const accNo = req.account!.accountNumber;
-
+  // Validation: loan exists
+  const loanId = await getLoanIdFromNumber(loan_number);
+  if (!loanId) {
+    res.status(404).json({ success: false, error: "loanNotFound" });
+    return;
+  }
+  // Validation: loan not written off and not paid off
+  const loanSummary = await db.oneOrNone('SELECT write_off FROM loans WHERE loan_number = $1', [loan_number]);
+  if (loanSummary?.write_off) {
+    res.status(410).json({ success: false, error: "loanWrittenOff" });
+    return;
+  }
+  const outstanding = await getOutstandingLoanAmount(loan_number);
+  if (outstanding <= 0) {
+    res.status(409).json({ success: false, error: "loanPaidOff" });
+    return;
+  }
+  // Validation: sufficient funds
+  const accountStatus = await db.oneOrNone('SELECT get_account_balance($1) AS balance', [accNo]);
+  if (!accountStatus || accountStatus.balance < amount) {
+    res.status(422).json({ success: false, error: "paymentNotPermitted" });
+    return;
+ }
   try {
     const repayment = await repayLoan(loan_number, accNo, amount);
     res.status(200).json(repayment);
@@ -82,7 +135,11 @@ router.get("/:loan_number", async (req: Request<{ loan_number: string }>, res: R
 
   try {
     const loanDetails = await getLoanDetails(loan_number, accNo);
-    res.status(200).json(loanDetails);
+    if (loanDetails.success)
+      { res.status(200).json({ success: true, loan: loanDetails }); }
+    else if (loanDetails.error === "loanNotFound")
+      { res.status(404).json({ success: false, error: "loanNotFound" }); }
+    else { res.status(500).json({ success: false, error: "internalError" }); }
   }
   catch (error) {
     logger.error("Error getting loan details:", error);

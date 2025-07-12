@@ -1,5 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { createAccount, CreateAccountResult, getAccountInformation, updateAccountNotificationUrl } from '../queries/accounts.queries';
+import {
+  createAccount,
+  getAccountInformation,
+  updateAccountNotificationUrl,
+  getAccountBalance,
+} from '../queries/accounts.queries';
 import { interbankTransfer } from '../queries/banks.queries';
 import { logger } from '../utils/logger';
 import { getSimTime } from '../utils/time';
@@ -11,8 +16,9 @@ import {
   Post_AccountMeNotify_Res,
   Get_AccountMe_Req,
   Post_InterbankTransfer_Req,
-  Post_InterbankTransfer_Res
+  Post_InterbankTransfer_Res,
 } from '../types/endpoint.types';
+import db from '../config/db.config';
 
 //=============== /account ==============//
 
@@ -23,12 +29,14 @@ router.get('/', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<Ge
     const teamId = req.teamId;
     const accountInformation = await getAccountInformation(teamId!);
 
-    if(accountInformation) { res.status(200).json({ success: true, account_number: accountInformation.account_number }); }
-    else                   { res.status(404).json({ success: false, error: "accountNotFound" }); }
-
+    if (accountInformation) {
+      res.status(200).json({ success: true, account_number: accountInformation.account_number });
+    } else {
+      res.status(404).json({ success: false, error: 'accountNotFound' });
+    }
   } catch (error) {
     logger.error('Error fetching accounts:', error);
-    res.status(500).json({ success: false, error: "internalError" });
+    res.status(500).json({ success: false, error: 'internalError' });
   }
 });
 
@@ -39,26 +47,28 @@ router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Po
     const teamId = req.teamId;
 
     if (!callbackURL) {
-      res.status(400).json({ success: false, error: "invalidPayload" });
+      res.status(400).json({ success: false, error: 'invalidPayload' });
       return;
     }
 
-    const newAccount: CreateAccountResult = await createAccount(createdAt, callbackURL, teamId ?? '');
+    const newAccount = await createAccount(createdAt, callbackURL, teamId ?? '');
 
-    if (newAccount.account_number === 'account exist') {
+    if (!newAccount.success && newAccount.error === 'accountAlreadyExists') {
       logger.info(`Account already exists for team ID: ${teamId}`);
-      res.status(409).json({ success: false, error: "accountAlreadyExists" });
+      res.status(409).json({ success: false, error: 'accountAlreadyExists' });
       return;
     }
 
-    if(isValidAccountNumber(newAccount.account_number)) {
+    if (newAccount.success && isValidAccountNumber(newAccount.account_number)) {
       res.status(201).json({ success: true, account_number: newAccount.account_number });
+    } else if (!newAccount.success) {
+      res.status(500).json({ success: false, error: newAccount.error ?? 'internalError' });
     } else {
-      res.status(500).json({ success: false, error: "internalError" });
+      res.status(500).json({ success: false, error: 'internalError' });
     }
   } catch (error) {
     logger.error('Error creating account:', error);
-    res.status(500).json({ success: false, error: "internalError" });
+    res.status(500).json({ success: false, error: 'internalError' });
   }
 });
 
@@ -78,22 +88,76 @@ router.post('/interbank-transfer', async (req: Request<{}, {}, Post_InterbankTra
     logger.error('Error processing interbank transfer:', error);
     res.status(500).json({ success: false, error: 'internalError' });
   }
+} );
+
+router.get('/me/balance', async (req: Request, res: Response) => {
+  try {
+    const accountNumber = req.account?.accountNumber;
+    if (!accountNumber) {
+      res.status(404).json({ success: false, error: 'accountNotFound' });
+      return;
+    }
+    const balance = await getAccountBalance(accountNumber);
+    if (balance === null) {
+      res.status(404).json({ success: false, error: 'accountNotFound' });
+      return;
+    }
+    res.status(200).json({ success: true, balance });
+  } catch (error) {
+    logger.error('Error fetching account balance:', error);
+    res.status(500).json({ success: false, error: 'internalError' });
+  }
 });
+
+router.get('/me/frozen', async (req: Request, res: Response) => {
+  try {
+    const accountNumber = req.account?.accountNumber;
+    if (!accountNumber) {
+      res.status(404).json({ success: false, error: 'accountNotFound' });
+      return;
+    }
+    // Use the DB helper function for frozen status
+    const result = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [accountNumber]);
+    if (result === null) {
+      res.status(404).json({ success: false, error: 'accountNotFound' });
+      return;
+    }
+    res.status(200).json({ success: true, frozen: result.frozen });
+  } catch (error) {
+    logger.error('Error checking frozen status:', error);
+    res.status(500).json({ success: false, error: 'internalError' });
+  }
+});
+
+// FIX: Add URL format validation for /account/me/notify
+function isValidUrl(urlString?: string): boolean {
+  try {
+    if (!urlString) return false;
+    new URL(urlString);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 router.post('/account/me/notify', async (req: Request<{}, {}, Post_AccountMeNotify_Req>, res: Response<Post_AccountMeNotify_Res>) => {
   try {
     const { notification_url } = req.body;
     const teamId = req.account?.teamId;
 
-    if (!notification_url)  { res.status(400).json({ success: false, error: "invalidNotificationUrl" }); }
-    else if (!teamId)       { res.status(403).json({ success: false, error: "accountNotFound" }); }
-    else {
-      await updateAccountNotificationUrl(teamId, notification_url);
-      res.status(200).json({ success: true });
+    if (!notification_url || !isValidUrl(notification_url)) { // FIX: Validate URL format
+      res.status(400).json({ success: false, error: 'invalidNotificationUrl' });
+      return;
     }
+    if (!teamId) {
+      res.status(403).json({ success: false, error: 'accountNotFound' });
+      return;
+    }
+    await updateAccountNotificationUrl(teamId, notification_url);
+    res.status(200).json({ success: true });
   } catch (error) {
     logger.error('Error updating notification URL:', error);
-    res.status(500).json({ success: false, error: "internalError" });
+    res.status(500).json({ success: false, error: 'internalError' });
   }
 });
 

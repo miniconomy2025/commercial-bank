@@ -11,21 +11,23 @@ export const getAllTransactions = async (
   let query = `
     SELECT
       t.transaction_number,
+      from_ref.account_number AS "from",
+      to_ref.account_number AS "to",
       t.amount,
       t.description,
-      t.status_id,
-      t.created_at AS date,
-      from_ref.account_number AS "from",
-      to_ref.account_number AS "to"
+      s.name AS status,
+      t.created_at AS timestamp
     FROM transactions t
     JOIN account_refs from_ref ON t."from" = from_ref.id
     JOIN account_refs to_ref ON t."to" = to_ref.id
-    WHERE from_ref.account_number = $1 AND to_ref.account_number = $2
+    JOIN transaction_statuses s ON t.status_id = s.id
+    WHERE (from_ref.account_number = $1 OR to_ref.account_number = $1)
+      AND (from_ref.account_number = $2 OR to_ref.account_number = $2)
   `;
 
   if (onlySuccessful) {
     query += ' AND t.status_id = $3';
-    parameters.push(1);
+    parameters.push(1); // Assuming 1 = success
   }
 
   return db.manyOrNone(query, parameters);
@@ -74,14 +76,15 @@ export const createTransaction = async (
 export const getTransactionById = async (id: string): Promise<Transaction | null> => {
   return db.oneOrNone(`SELECT
     t.transaction_number,
+    from_ref.account_number AS "from",
+    to_ref.account_number AS "to",
     t.amount,
     t.description,
-    t.status_id,
-    t.created_at AS date,
-    from_ref.account_number AS "from",
-    to_ref.account_number AS "to"
+    s.name AS status,
+    t.created_at AS timestamp
   FROM transactions t
   JOIN account_refs from_ref ON t."from" = from_ref.id
   JOIN account_refs to_ref ON t."to" = to_ref.id
+  JOIN transaction_statuses s ON t.status_id = s.id
   WHERE t.transaction_number =  $1`, [id]);
 }
