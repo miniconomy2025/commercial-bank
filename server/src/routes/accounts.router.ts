@@ -53,7 +53,7 @@ router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Po
 
     const newAccount = await createAccount(createdAt, notification_url, teamId ?? '');
 
-    if (!newAccount.success && newAccount.error === 'accountAlreadyExists') {
+    if (newAccount.success && newAccount.account_number === 'accountAlreadyExists') {
       logger.info(`Account already exists for team ID: ${teamId}`);
       res.status(409).json({ success: false, error: 'accountAlreadyExists' });
       return;

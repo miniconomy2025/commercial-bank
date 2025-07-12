@@ -13,7 +13,7 @@ BEGIN
     
     BEGIN
         IF EXISTS (SELECT 1 FROM accounts WHERE accounts.team_id = create_account.team_id) THEN
-            account_number := 'account exist';
+            account_number := 'accountAlreadyExists';
             RETURN;
         END IF;
         

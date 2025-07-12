@@ -21,29 +21,29 @@ function onEachDay() {
     attemptInstalments();
 }
 
-router.post("/start", async (req, res) => {
+router.post("/", async (req, res) => {
     try {
-        const { startingTime } = snakeToCamelCaseMapper(req.body);
+        const { epochStartTime } = snakeToCamelCaseMapper(req.body);
 
         const balanceData = await getStartingBalance();
 
-        if (!startingTime || !balanceData) {
+        if (!epochStartTime || !balanceData) {
           res.status(400).json({ error: "Bad Request: Missing required fields: starting_time, starting_balance, from_account_number" });
           return;
         }
 
         const { initial_bank_balance, prime_rate } = balanceData;
 
-        if (!startingTime ) {
+        if (!epochStartTime ) {
             res.status(400).json({ error: "Bad Request: Missing required fields: starting_time, starting_balance, from_account_number" });
             return;
         }
 
-        resetDB(startingTime);
+        resetDB(epochStartTime);
 
         setLoanInterestRate(Number(prime_rate))
         const fromAccountNumber = await getAccountFromOrganizationUnit('thoh').then(account => account?.accountNumber);
-        initSimulation(startingTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
+        initSimulation(epochStartTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
         const toAccountNumber = await getAccountFromOrganizationUnit('commercial-bank').then(account => account?.accountNumber);
         if (!toAccountNumber) {
             res.status(404).json({ error: "Commercial bank account not found" });
@@ -77,7 +77,7 @@ const getStartingBalance = async (): Promise<{prime_rate:number,initial_bank_bal
   }
 };
 
-router.post("/end", async (req, res) => {
+router.delete("/", async (req, res) => {
     try {
         endSimulation();
         res.status(200).send();
