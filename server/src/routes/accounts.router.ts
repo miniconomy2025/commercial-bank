@@ -27,10 +27,10 @@ const router = Router();
 router.get('/', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<Get_AccountMe_Res>) => {
   try {
     const teamId = req.teamId;
-    const accountInformation = await getAccountInformation(teamId!);
+    const accInfo = await getAccountInformation(teamId!);
 
-    if (accountInformation) {
-      res.status(200).json({ success: true, account_number: accountInformation.account_number });
+    if (accInfo != null) {
+      res.status(200).json({ success: true, ...accInfo });
     } else {
       res.status(404).json({ success: false, error: 'accountNotFound' });
     }
