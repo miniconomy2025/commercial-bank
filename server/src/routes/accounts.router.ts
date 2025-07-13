@@ -19,6 +19,7 @@ import {
   Post_InterbankTransfer_Res,
 } from '../types/endpoint.types';
 import db from '../config/db.config';
+import { accountMiddleware } from '../middlewares/auth.middleware';
 
 //=============== /account ==============//
 
@@ -90,7 +91,7 @@ router.post('/interbank-transfer', async (req: Request<{}, {}, Post_InterbankTra
   }
 } );
 
-router.get('/me/balance', async (req: Request, res: Response) => {
+router.get('/me/balance', accountMiddleware, async (req: Request, res: Response) => {
   try {
     const teamId = req.teamId;
     if (!teamId) {
@@ -109,7 +110,7 @@ router.get('/me/balance', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/me/frozen', async (req: Request, res: Response) => {
+router.get('/me/frozen', accountMiddleware, async (req: Request, res: Response) => {
   try {
     const teamId = req.teamId;
     if (!teamId) {
