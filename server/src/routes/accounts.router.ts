@@ -59,7 +59,7 @@ router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Po
       return;
     }
 
-    if (newAccount.success && isValidAccountNumber(newAccount.account_number)) {
+    if (newAccount.success && isValidteamId(newAccount.account_number)) {
       res.status(201).json({ success: true, account_number: newAccount.account_number });
     } else if (!newAccount.success) {
       res.status(500).json({ success: false, error: newAccount.error ?? 'internalError' });
@@ -92,12 +92,12 @@ router.post('/interbank-transfer', async (req: Request<{}, {}, Post_InterbankTra
 
 router.get('/me/balance', async (req: Request, res: Response) => {
   try {
-    const accountNumber = req.account?.accountNumber;
-    if (!accountNumber) {
+    const teamId = req.teamId;
+    if (!teamId) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
-    const balance = await getAccountBalance(accountNumber);
+    const balance = await getAccountBalance(teamId);
     if (balance === null) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
@@ -111,13 +111,13 @@ router.get('/me/balance', async (req: Request, res: Response) => {
 
 router.get('/me/frozen', async (req: Request, res: Response) => {
   try {
-    const accountNumber = req.account?.accountNumber;
-    if (!accountNumber) {
+    const teamId = req.teamId;
+    if (!teamId) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
     // Use the DB helper function for frozen status
-    const result = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [accountNumber]);
+    const result = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [teamId]);
     if (result === null) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
@@ -143,7 +143,7 @@ function isValidUrl(urlString?: string): boolean {
 router.post('/account/me/notify', async (req: Request<{}, {}, Post_AccountMeNotify_Req>, res: Response<Post_AccountMeNotify_Res>) => {
   try {
     const { notification_url } = req.body;
-    const teamId = req.account?.teamId;
+    const teamId = req.teamId;
 
     if (!notification_url || !isValidUrl(notification_url)) { // FIX: Validate URL format
       res.status(400).json({ success: false, error: 'invalidNotificationUrl' });
@@ -161,8 +161,8 @@ router.post('/account/me/notify', async (req: Request<{}, {}, Post_AccountMeNoti
   }
 });
 
-const isValidAccountNumber = (accountNumber: string): boolean => {
-  return /^[0-9]+$/.test(accountNumber) && accountNumber.length === 12;
+const isValidteamId = (teamId: string): boolean => {
+  return /^[0-9]+$/.test(teamId) && teamId.length === 12;
 }
 
 export default router;
