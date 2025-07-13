@@ -3,7 +3,7 @@
 
 import { Router, Response } from "express";
 import { snakeToCamelCaseMapper } from "../utils/mapper";
-import { endSimulation, getDateTimeAsISOString, initSimulation } from "../utils/time";
+import { endSimulation, getDateTimeAsISOString, getSimTime, initSimulation } from "../utils/time";
 import { createTransaction } from "../queries/transactions.queries";
 import { getAccountFromOrganizationUnit } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
@@ -51,7 +51,7 @@ router.post("/", async (req, res) => {
             return;
         }
         await createTransaction(toAccountNumber, fromAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
-        res.status(200).send();
+        res.status(200).send(`${appConfig.thohHost}/orders/payments`);
     } catch (error) {
         logger.error("Error starting simulation:", error);
         res.status(500).json({ error: "Internal Server Error" });
@@ -75,6 +75,7 @@ const getStartingBalance = (): Observable<{ prime_rate: number; investment_value
 router.delete("/", async (req, res) => {
     try {
         endSimulation();
+        resetDB(getSimTime());
         res.status(200).send();
     } catch (error) {
         res.status(500).json({ error: "Internal Server Error" });
