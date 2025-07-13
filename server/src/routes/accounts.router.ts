@@ -25,7 +25,7 @@ import { accountMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.get('/', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<Get_AccountMe_Res>) => {
+router.get('/me', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<Get_AccountMe_Res>) => {
   try {
     const teamId = req.teamId;
     const accInfo = await getAccountInformation(teamId!);
