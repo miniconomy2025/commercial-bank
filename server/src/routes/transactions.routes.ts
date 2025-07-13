@@ -58,6 +58,11 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
   if (from_account_number === to_account_number)
     { res.status(400).json({ success: false, error: "invalidPayload" }); return; }
 
+  if (!/^\d{12}$/.test(from_account_number) || !/^\d{12}$/.test(to_account_number)) {
+    res.status(400).json({ success: false, error: "invalidPayload" });
+    return;
+  }
+
   // Validation: to_bank_name must be valid
   const validBanks = ["commercial-bank", "thoh"]; // NOTE: "retail-bank" should never be a recipient
   if (!validBanks.includes(to_bank_name))
@@ -85,7 +90,7 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
     let newTransaction;
     if (to_bank_name) {
       newTransaction = await createTransaction(
-        to_account_number,
+        to_account_number, 
         from_account_number,
         amount,
         description,
