@@ -14,7 +14,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction }) => (
       <div className="transaction-info">
         <h4 className="transaction-company">{transaction.to}</h4>
         <p className="transaction-type">{transaction.from}</p>
-        <p className="transaction-type">{transaction.description}{transaction.time}</p>
+        <p className="transaction-type">{transaction.description}{transaction.timestamp}</p>
       </div>
     </div>
 
