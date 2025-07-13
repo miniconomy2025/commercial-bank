@@ -46,7 +46,7 @@ router.post("/", async (req, res) => {
             return;
         }
         await createTransaction(fromAccountNumber!, toAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
-        res.status(200).send(getDateTimeAsISOString());
+        res.status(200).send();
     } catch (error) {
         logger.error("Error starting simulation:", error);
         res.status(500).json({ error: "Internal Server Error" });
