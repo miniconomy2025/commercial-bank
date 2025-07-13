@@ -99,7 +99,7 @@ router.get('/me/balance', accountMiddleware, async (req: Request, res: Response)
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
-    const balance = await getAccountBalance(teamId);
+    const balance = await getAccountBalance(accountNumber);
     if (balance === null) {
       console.log("Balance is null for account:", accountNumber);
       res.status(404).json({ success: false, error: 'accountNotFound' });
@@ -114,13 +114,13 @@ router.get('/me/balance', accountMiddleware, async (req: Request, res: Response)
 
 router.get('/me/frozen', accountMiddleware, async (req: Request, res: Response) => {
   try {
-    const teamId = req.teamId;
-    if (!teamId) {
+    const accountNumber = req.account?.accountNumber;
+    if (!accountNumber) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
     // Use the DB helper function for frozen status
-    const result = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [teamId]);
+    const result = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [accountNumber]);
     if (result === null) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
