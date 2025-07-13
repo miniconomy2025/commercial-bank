@@ -6,6 +6,7 @@ import './Accounts.css';
 import { apiGet } from '../../services/api';
 import type { Account } from '../../types/Accounts';
 import Chart from '../../components/LineChart/LineChart';
+import type { Transaction } from '../../types/Transaction';
 
 const processLoanRepayments = (loans: any[]) => {
   if (!loans.length) return { data: [], yKeys: [] };
@@ -131,24 +132,30 @@ const IndividualAccountContent = () => {
 
     try {
       // Fetch new transactions for current account since last update
-      const fetchedTransactions = await apiGet<any[]>(`/dashboard/transactions?account=${selectedAccount.name}`);
+      const transactionsResponse = await apiGet<{ success: boolean; transactions: any[] }>(`/dashboard/transactions?account=${selectedAccount.name}`);
       
-      // Filter transactions newer than our last known transaction
-      const newTransactions = fetchedTransactions.filter(t => 
-        Number(t.time) > lastTransactionTimeRef.current
-      );
-      
-      if (newTransactions.length > 0) {
-        updateTransactions(newTransactions);
+      if (transactionsResponse.success) {
+        // Filter transactions newer than our last known transaction
+        const newTransactions = transactionsResponse.transactions.filter(t => 
+          Number(t.time) > lastTransactionTimeRef.current
+        );
+        
+        if (newTransactions.length > 0) {
+          updateTransactions(newTransactions);
+        }
       }
       
       // Update loans data (check for changes in outstanding amounts)
-      const fetchedLoans = await apiGet<any[]>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`);
-      updateLoans(fetchedLoans);
+      const loansResponse = await apiGet<{ success: boolean; loans: any[] }>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`);
+      if (loansResponse.success) {
+        updateLoans(loansResponse.loans);
+      }
       
       // Update accounts data (balances might have changed)
-      const fetchedAccounts = await apiGet<Account[]>('/dashboard/accounts');
-      updateAccounts(fetchedAccounts);
+      const accountsResponse = await apiGet<{ success: boolean; accounts: Account[] }>('/dashboard/accounts');
+      if (accountsResponse.success) {
+        updateAccounts(accountsResponse.accounts);
+      }
       
     } catch (err: any) {
       console.error('Polling error:', err);
@@ -161,7 +168,13 @@ const IndividualAccountContent = () => {
     const initialFetch = async () => {
       try {
         setIsLoading(true);
-        const fetchedAccounts = await apiGet<Account[]>('/dashboard/accounts');
+        const accountsResponse = await apiGet<{ success: boolean; accounts: Account[] }>('/dashboard/accounts');
+        
+        if (!accountsResponse.success) {
+          throw new Error('Failed to fetch accounts');
+        }
+
+        const fetchedAccounts = accountsResponse.accounts;
         setAccounts(fetchedAccounts);
         
         if (fetchedAccounts.length > 0) {
@@ -189,20 +202,32 @@ const IndividualAccountContent = () => {
         setIsTransactionsLoading(true);
         currentAccountRef.current = selectedAccount.id;
         
-        const [fetchedTransactions, fetchedLoans] = await Promise.all([
-          apiGet<any[]>(`/dashboard/transactions?account=${selectedAccount.name}`),
-          apiGet<any[]>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`)
+        const [transactionsResponse, loansResponse] = await Promise.all([
+          apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${selectedAccount.name}`),
+          apiGet<{ success: boolean; loans: any[] }>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`)
         ]);
         
-        setTransactions(fetchedTransactions);
-        setLoans(fetchedLoans);
-        
-        // Update last transaction time
-        if (fetchedTransactions.length > 0) {
-          lastTransactionTimeRef.current = Math.max(...fetchedTransactions.map(t => Number(t.time) || 0));
+        if (transactionsResponse.success) {
+          setTransactions(transactionsResponse.transactions);
+          
+          // Update last transaction time
+          if (transactionsResponse.transactions.length > 0) {
+            lastTransactionTimeRef.current = Math.max(...transactionsResponse.transactions.map(t => Number(t.timestamp) || 0));
+          }
+        } else {
+          console.error('Failed to fetch transactions:', transactionsResponse);
+          setTransactions([]);
+        }
+
+        if (loansResponse.success) {
+          setLoans(loansResponse.loans);
+        } else {
+          console.error('Failed to fetch loans:', loansResponse);
+          setLoans([]);
         }
         
       } catch (err: any) {
+        console.error('Error fetching account data:', err);
         setError(err.message);
       } finally {
         setIsTransactionsLoading(false);
