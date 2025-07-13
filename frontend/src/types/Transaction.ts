@@ -6,7 +6,7 @@ export interface Transaction {
   amount: number;
   description: string;
   status: string;
-  time: SimTime
+  timestamp: SimTime
 };
 
 export type SimTime = number;
