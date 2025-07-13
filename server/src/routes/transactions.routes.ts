@@ -110,7 +110,7 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
       transaction_number: newTransaction.transaction_number,
       status: newTransaction.status,
       amount,
-      timestamp: Date.now() / 1000, // simulation time, replace with getSimTime() if available
+      timestamp: newTransaction.timestamp, // simulation time, replace with getSimTime() if available
       description,
       from: from_account_number,
       to: to_account_number

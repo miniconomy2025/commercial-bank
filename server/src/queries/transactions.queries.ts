@@ -65,7 +65,8 @@ export const createTransaction = async (
   SELECT
       i.transaction_id,
       i.transaction_number,
-      s.name AS status
+      s.name AS status,
+      i.created_at AS timestamp
   FROM inserted i
   JOIN transaction_statuses s ON s.id = i.status_id;
   `,

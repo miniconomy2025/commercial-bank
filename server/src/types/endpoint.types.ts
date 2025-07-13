@@ -70,6 +70,7 @@ export type CreateTransactionResult = {
   status: string;
   transaction_number: string;
   transaction_id: number; 
+  timestamp: SimTime;
 };
 
 export type Transaction = {
