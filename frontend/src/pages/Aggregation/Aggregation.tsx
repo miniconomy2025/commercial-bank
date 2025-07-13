@@ -11,7 +11,7 @@ const processBalanceData = (
   accounts: Account[],
   selectedAccounts: string[],
   transactions: Transaction[],
-  maxPoints = 10
+  maxPoints = 15
 ): {
   data: any[],
   yKeys: string[]
@@ -23,13 +23,13 @@ const processBalanceData = (
   const txns = transactions
     .map(txn => ({
       ...txn,
-      time: Number(txn.time) || 0,
+      time: Number(txn.timestamp) || 0,
       amount: Number(txn.amount) || 0,
     }))
     .filter(txn => !isNaN(txn.time) && !isNaN(txn.amount))
     .sort((a, b) => a.time - b.time);
 
-  let uniqueTimes = Array.from(new Set(txns.map(t => t.time))).sort((a, b) => a - b);
+  let uniqueTimes = Array.from(new Set(txns.map(t => t.timestamp))).sort((a, b) => a - b);
 
   if (uniqueTimes.length > maxPoints) {
     const step = (uniqueTimes.length - 1) / (maxPoints - 1);
@@ -45,7 +45,7 @@ const processBalanceData = (
     if (!account) return;
 
     const balances: number[] = [];
-    let balance = 0;
+    let balance = parseFloat(account.loanBalance) || 0; // Start with current loan balance
     let txnIndex = 0;
 
     uniqueTimes.forEach(time => {
@@ -82,7 +82,7 @@ const processBalanceData = (
 const AggregationContent = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   // Refs to track polling state and prevent unnecessary re-renders
@@ -91,12 +91,12 @@ const AggregationContent = () => {
   const isInitialLoadRef = useRef(true);
 
   // Memoized function to update transactions without causing re-renders
-  const updateTransactions = useCallback((newTransactions: any[]) => {
+  const updateTransactions = useCallback((newTransactions: Transaction[]) => {
     setTransactions(prevTransactions => {
       // Filter out transactions we already have
-      const existingIds = new Set(prevTransactions.map(t => t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`));
+      const existingIds = new Set(prevTransactions.map(t => t.transaction_number || `${t.timestamp}-${t.amount}-${t.from}-${t.to}`));
       const uniqueNewTransactions = newTransactions.filter(t => 
-        !existingIds.has(t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`)
+        !existingIds.has(t.transaction_number || `${t.timestamp}-${t.amount}-${t.from}-${t.to}`)
       );
       
       if (uniqueNewTransactions.length === 0) {
@@ -104,12 +104,12 @@ const AggregationContent = () => {
       }
       
       // Update last transaction time
-      const latestTime = Math.max(...newTransactions.map(t => Number(t.time) || 0));
+      const latestTime = Math.max(...newTransactions.map(t => Number(t.timestamp) || 0));
       lastTransactionTimeRef.current = Math.max(lastTransactionTimeRef.current, latestTime);
       
       // Return new array with appended transactions
       return [...prevTransactions, ...uniqueNewTransactions].sort((a, b) => 
-        (Number(a.time) || 0) - (Number(b.time) || 0)
+        (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0)
       );
     });
   }, []);
@@ -119,12 +119,21 @@ const AggregationContent = () => {
     if (isInitialLoadRef.current) return; // Skip polling during initial load
 
     try {
-      // Fetch new transactions since last update
-      const fetchedTransactions = await apiGet<any[]>('/dashboard/transactions');
+      // Fetch new transactions for all selected accounts
+      const transactionPromises = selectedAccounts.map(async (accountId) => {
+        const account = accounts.find(a => a.id === accountId);
+        if (!account) return [];
+        
+        const response = await apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${account.name}`);
+        return response.success ? response.transactions : [];
+      });
+
+      const allTransactionArrays = await Promise.all(transactionPromises);
+      const allTransactions = allTransactionArrays.flat();
       
       // Filter transactions newer than our last known transaction
-      const newTransactions = fetchedTransactions.filter(t => 
-        Number(t.time) > lastTransactionTimeRef.current
+      const newTransactions = allTransactions.filter(t => 
+        Number(t.timestamp) > lastTransactionTimeRef.current
       );
       
       if (newTransactions.length > 0) {
@@ -132,43 +141,62 @@ const AggregationContent = () => {
       }
       
       // Optionally check for new accounts (less frequent)
-      // You could make this less frequent by using a counter
-      const fetchedAccounts = await apiGet<Account[]>('/dashboard/accounts');
-      setAccounts(prevAccounts => {
-        const accountIds = new Set(prevAccounts.map(a => a.id));
-        const newAccounts = fetchedAccounts.filter(a => !accountIds.has(a.id));
-        
-        if (newAccounts.length === 0) {
-          return prevAccounts; // No new accounts, return same reference
-        }
-        
-        // Auto-select new accounts
-        setSelectedAccounts(prev => [...prev, ...newAccounts.map(a => a.id)]);
-        return [...prevAccounts, ...newAccounts];
-      });
+      const accountsResponse = await apiGet<{ success: boolean; accounts: Account[] }>('/dashboard/accounts');
+      if (accountsResponse.success) {
+        setAccounts(prevAccounts => {
+          const accountIds = new Set(prevAccounts.map(a => a.id));
+          const newAccounts = accountsResponse.accounts.filter(a => !accountIds.has(a.id));
+          
+          if (newAccounts.length === 0) {
+            return prevAccounts; // No new accounts, return same reference
+          }
+          
+          // Auto-select new accounts
+          setSelectedAccounts(prev => [...prev, ...newAccounts.map(a => a.id)]);
+          return [...prevAccounts, ...newAccounts];
+        });
+      }
       
     } catch (err: any) {
       console.error('Polling error:', err);
       // Don't update error state to avoid re-renders, just log
     }
-  }, [updateTransactions]);
+  }, [updateTransactions, selectedAccounts, accounts]);
 
   // Initial data fetch
   useEffect(() => {
     const initialFetch = async () => {
       try {
-        const [fetchedAccounts, fetchedTransactions] = await Promise.all([
-          apiGet<Account[]>('/dashboard/accounts'),
-          apiGet<any[]>('/dashboard/transactions')
-        ]);
+        // Fetch accounts first
+        const accountsResponse = await apiGet<{ success: boolean; accounts: Account[] }>('/dashboard/accounts');
         
+        if (!accountsResponse.success) {
+          throw new Error('Failed to fetch accounts');
+        }
+
+        const fetchedAccounts = accountsResponse.accounts;
         setAccounts(fetchedAccounts);
         setSelectedAccounts(fetchedAccounts.map(acc => acc.id));
-        setTransactions(fetchedTransactions);
+        
+        // Fetch transactions for all accounts
+        const transactionPromises = fetchedAccounts.map(async (account) => {
+          try {
+            const response = await apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${account.name}`);
+            return response.success ? response.transactions : [];
+          } catch (err) {
+            console.error(`Error fetching transactions for account ${account.name}:`, err);
+            return [];
+          }
+        });
+
+        const allTransactionArrays = await Promise.all(transactionPromises);
+        const allTransactions = allTransactionArrays.flat();
+        
+        setTransactions(allTransactions);
         
         // Update last transaction time
-        if (fetchedTransactions.length > 0) {
-          lastTransactionTimeRef.current = Math.max(...fetchedTransactions.map(t => Number(t.time) || 0));
+        if (allTransactions.length > 0) {
+          lastTransactionTimeRef.current = Math.max(...allTransactions.map(t => Number(t.timestamp) || 0));
         }
         
         isInitialLoadRef.current = false;
@@ -183,7 +211,7 @@ const AggregationContent = () => {
 
   // Setup polling
   useEffect(() => {
-    if (isInitialLoadRef.current) return; // Don't start polling until initial load is complete
+    if (isInitialLoadRef.current || selectedAccounts.length === 0) return; // Don't start polling until initial load is complete and accounts are selected
 
     // Start polling every 5 seconds (adjust as needed)
     pollingIntervalRef.current = setInterval(pollForUpdates, 5000);
@@ -193,7 +221,7 @@ const AggregationContent = () => {
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, [pollForUpdates]);
+  }, [pollForUpdates, selectedAccounts]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -217,6 +245,16 @@ const AggregationContent = () => {
     selectedAccounts,
     transactions
   );
+
+  if (error) {
+    return (
+      <div className="aggregation-container">
+        <div className="error-message">
+          Error loading data: {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="aggregation-container">

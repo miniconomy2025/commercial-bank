@@ -7,7 +7,7 @@ import appConfig from "../config/app.config";
 import { snakeToCamelCaseMapper } from "./mapper";
 import { rootCertificates } from 'tls';
 
-interface HttpClientResponse<T = any> {
+export interface HttpClientResponse<T = any> {
   statusCode?: number;
   data: T;
 }
