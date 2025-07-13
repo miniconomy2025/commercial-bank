@@ -120,8 +120,8 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
       case 'thoh':
         // Interbank notification
         httpClient.post(`${appConfig.thohHost}/orders/payments`, notificationPayload).subscribe({
-          next: (response) => { logger.info("Notification sent successfully:", response); },
-          error: (error) =>   { logger.info("Error sending notification:", error); }
+          next: (response) => { console.log("Notification sent successfully:", response); },
+          error: (error) =>   { console.log("Error sending notification:", error); }
         });
         // TODO: Correctly handle THOH response - If THOH returns an error, we should rollback the transaction
       break;

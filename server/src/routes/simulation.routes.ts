@@ -46,7 +46,11 @@ router.post("/", async (req, res) => {
             res.status(404).json({ error: "Commercial bank account not found" });
             return;
         }
-        await createTransaction(fromAccountNumber!, toAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
+        if (!fromAccountNumber) {
+            res.status(404).json({ error: "THOH account not found" });
+            return;
+        }
+        await createTransaction(toAccountNumber, fromAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
         res.status(200).send();
     } catch (error) {
         logger.error("Error starting simulation:", error);
