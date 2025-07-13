@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json());
 
 app.use('/api/account', authMiddleware, accountsRouter);
-app.use('/api/transactions', authMiddleware, accountMiddleware, transactionsRouter);
+app.use('/api/transaction', authMiddleware, accountMiddleware, transactionsRouter);
 app.use('/api/loan', authMiddleware, accountMiddleware, loansRouter);
 app.use('/simulation', authMiddleware, simulationMiddleware,SimulationRouter);
 app.use('/api/dashboard', dashboardMiddleware, DashboardRouter);
