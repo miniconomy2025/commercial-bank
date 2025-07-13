@@ -7,7 +7,7 @@ import { endSimulation, getDateTimeAsISOString, initSimulation } from "../utils/
 import { createTransaction } from "../queries/transactions.queries";
 import { getAccountFromOrganizationUnit } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
-import { attemptInstalments } from "../queries/loans.queries";
+import { attemptInstalments, setLoanCap } from "../queries/loans.queries";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 import { setLoanInterestRate } from "../queries/loans.queries";
 import { HttpClient, HttpClientResponse } from "../utils/http-client";
@@ -37,7 +37,8 @@ router.post("/", async (req, res) => {
 
         resetDB(epochStartTime);
 
-        setLoanInterestRate(Number(primeRate))
+        setLoanInterestRate(Number(primeRate));
+        setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);
         const fromAccountNumber = await getAccountFromOrganizationUnit('thoh').then(account => account?.accountNumber);
         initSimulation(epochStartTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
         const toAccountNumber = await getAccountFromOrganizationUnit('commercial-bank').then(account => account?.accountNumber);

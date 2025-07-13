@@ -27,6 +27,7 @@ const appConfig = {
   clientId: process.env.CLIENT_ID,
   thohTeamId: 'thoh',
   thohAccountNumber: '000000000000',
+  fractionalReserve: process.env.FRACTIONAL_RESERVE ? Number(process.env.FRACTIONAL_RESERVE) : 0.2
 };
 
 export default appConfig;

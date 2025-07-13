@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
-import { createLoan, getLoanDetails, getLoanIdFromNumber, getLoanSummariesForAccount, getOutstandingLoanAmount, getTotalOutstandingLoansForAccount, MAX_LOANABLE_AMOUNT, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
+import { createLoan, getLoanDetails, getLoanIdFromNumber, getLoanSummariesForAccount, getOutstandingLoanAmount, getTotalOutstandingLoansForAccount, maxLoanableAmount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
 import { logger } from '../utils/logger';
-import { snakeToCamelCaseMapper } from '../utils/mapper';
 import {
   Post_Loan_Req,
   Post_Loan_Res,
@@ -42,7 +41,7 @@ router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_
   }
   // Validation: loan permitted by outstanding loans and bank funds
   const outstandingLoans = await getTotalOutstandingLoansForAccount(borrowerAccNo);
-  if (outstandingLoans + amount > MAX_LOANABLE_AMOUNT) {
+  if (outstandingLoans + amount > maxLoanableAmount) {
     res.status(422).json({ success: false, error: "loanNotPermitted" });
     return;
   }

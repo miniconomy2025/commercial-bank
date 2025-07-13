@@ -7,13 +7,16 @@ import { sendNotification } from '../utils/notification';
 import { LoanDetails, LoanPayment, LoanResult, LoanSummary, RepaymentResult, Result, SimpleResult } from "../types/endpoint.types";
 
 
-// TODO: Move to config
-export const MAX_LOANABLE_AMOUNT = 1000000;
+export let maxLoanableAmount = 1000000; // Maximum amount that can be loaned out across all accounts
 export let loanInterestRate = 0.01;     // Interest charged each day on the outstanding loan amount
 
 export const setLoanInterestRate = (rate: number) => {
   loanInterestRate = rate;
 };
+
+export const setLoanCap = (amount: number) => {
+  maxLoanableAmount = amount;
+}
 
 
 export const getLoanIdFromNumber = async (loanNumber: string, t?: ITask<{}>): Promise<number | null> =>
@@ -57,7 +60,7 @@ export const createLoan = async (
     // Check amount valid
     if (amount <= 0) return { success: false, error: "invalidLoanAmount" };
 
-    const remaining = Math.max(0, MAX_LOANABLE_AMOUNT - await getTotalOutstandingLoansForAccount(accountNumber, t));
+    const remaining = Math.max(0, maxLoanableAmount - await getTotalOutstandingLoansForAccount(accountNumber, t));
     if (amount > remaining) return { success: false, error: "loanTooLarge", amount_remaining: remaining };
 
     // Get commercial-bank account no.
