@@ -93,13 +93,15 @@ router.post('/interbank-transfer', async (req: Request<{}, {}, Post_InterbankTra
 
 router.get('/me/balance', accountMiddleware, async (req: Request, res: Response) => {
   try {
-    const teamId = req.teamId;
-    if (!teamId) {
+    const accountNumber = req.account?.accountNumber;
+    if (!accountNumber) {
+      console.log(accountNumber)
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
     const balance = await getAccountBalance(teamId);
     if (balance === null) {
+      console.log("Balance is null for account:", accountNumber);
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
