@@ -46,13 +46,21 @@ export const getAccountInformation = async (teamId: string): Promise<AccountInfo
   try {
     const accountInformation = await db.oneOrNone<AccountInfo>(
       `SELECT 
-      SUM(CASE WHEN transactions."to" = accounts.id THEN transactions.amount ELSE 0 END) - 
-      SUM(CASE WHEN transactions."from" = accounts.id THEN transactions.amount ELSE 0 END) AS net_balance,
-      account_number
-      FROM accounts
-      LEFT JOIN transactions ON (transactions."to" = accounts.id OR transactions."from" = accounts.id)
-      WHERE accounts.team_id = $1
-      GROUP BY accounts.id, accounts.account_number;`,
+        a.account_number,
+        COALESCE(incoming.total, 0) - COALESCE(outgoing.total, 0) AS net_balance
+      FROM accounts a
+      LEFT JOIN account_refs ar ON a.account_number = ar.account_number
+      LEFT JOIN (
+        SELECT t."to" AS account_ref_id, SUM(t.amount) AS total
+        FROM transactions t
+        GROUP BY t."to"
+      ) incoming ON ar.id = incoming.account_ref_id
+      LEFT JOIN (
+        SELECT t."from" AS account_ref_id, SUM(t.amount) AS total
+        FROM transactions t
+        GROUP BY t."from"
+      ) outgoing ON ar.id = outgoing.account_ref_id
+      WHERE a.team_id = $1;`,
       [teamId]
     );
     return accountInformation;
