@@ -41,38 +41,55 @@ export const getTransactionStatusId = async (statusName: string): Promise<number
 // Blindly create a transaction
 // Validation must be done before calling this function
 export const createTransaction = async (
-    recipient_account_number: string,
-    sender_account_number: string,
-    amount: number,
-    description: string,
-    sender_bank_name: string = 'commercial-bank',
-    recipient_bank_name: string = 'commercial-bank',
-    transactionNumber?: string
-  )
-: Promise<CreateTransactionResult> => {
+  recipient_account_number: string,
+  sender_account_number: string,
+  amount: number,
+  description: string,
+  sender_bank_name: string = 'commercial-bank',
+  recipient_bank_name: string = 'commercial-bank',
+  transactionNumber?: string
+): Promise<CreateTransactionResult> => {
   return db.one(
-  `WITH
-      inserted AS (
-        INSERT INTO transactions (transaction_number, "from", "to", amount, description, status_id, created_at)
-        VALUES (
-          COALESCE($8, generate_unique_transaction_number()),
-          get_or_create_account_ref_id($1, $2),
-          get_or_create_account_ref_id($3, $4),
-          $5, $6, 1, $7
-        )
-        RETURNING id AS transaction_id, transaction_number, status_id
+    `
+    WITH inserted AS (
+      INSERT INTO transactions (
+        transaction_number,
+        "from",
+        "to",
+        amount,
+        description,
+        status_id,
+        created_at
+      )
+      VALUES (
+        COALESCE($8, generate_unique_transaction_number()),
+        get_or_create_account_ref_id($1, $2),
+        get_or_create_account_ref_id($3, $4),
+        $5, $6, 1, $7
+      )
+      RETURNING id AS transaction_id, transaction_number, status_id, created_at
     )
-  SELECT
+    SELECT
       i.transaction_id,
       i.transaction_number,
       s.name AS status,
       i.created_at AS timestamp
-  FROM inserted i
-  JOIN transaction_statuses s ON s.id = i.status_id;
-  `,
-    [sender_account_number, sender_bank_name, recipient_account_number, recipient_bank_name, amount, description, getSimTime(), transactionNumber ?? null]
+    FROM inserted i
+    JOIN transaction_statuses s ON s.id = i.status_id;
+    `,
+    [
+      sender_account_number,
+      sender_bank_name,
+      recipient_account_number,
+      recipient_bank_name,
+      amount,
+      description,
+      getSimTime(),
+      transactionNumber ?? null
+    ]
   );
-}
+};
+
 
 export const getTransactionById = async (id: string): Promise<Transaction | null> => {
   return db.oneOrNone(`SELECT

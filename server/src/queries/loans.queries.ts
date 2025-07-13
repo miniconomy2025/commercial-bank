@@ -8,7 +8,7 @@ import { LoanDetails, LoanPayment, LoanResult, LoanSummary, RepaymentResult, Res
 
 
 // TODO: Move to config
-export const MAX_LOANABLE_AMOUNT = 10000; // Max. amount an account can borrow in total across all loans
+export const MAX_LOANABLE_AMOUNT = 1000000;
 export let loanInterestRate = 0.01;     // Interest charged each day on the outstanding loan amount
 
 export const setLoanInterestRate = (rate: number) => {
@@ -103,7 +103,6 @@ export const getLoanPaymentsByNumber = async (loanNumber: string): Promise<LoanP
     JOIN transactions t ON lp.transaction_id = t.id
     JOIN loans l ON lp.loan_id = l.id
     WHERE l.loan_number = $1
-    ORDER BY t.created_at;
   `, [loanNumber]);
 }
 
