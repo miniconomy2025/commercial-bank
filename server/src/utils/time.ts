@@ -22,7 +22,7 @@ export function initSimulation(simStartTime: number, onEachDay?: (simTime: SimTi
 
   if (syncIntervalId) clearInterval(syncIntervalId);
   syncIntervalId = setInterval(() => {
-    syncSimulationTime();
+    // syncSimulationTime();
     onEachDay?.(getSimTime());
   }, REAL_MS_PER_SIM_DAY);
 }
@@ -46,7 +46,7 @@ export function getDateTimeAsISOString(): String{
  * Sync the simulation clock
  */
 function syncSimulationTime() {
-    httpClient.get(`${appConfig.thohHost}/simulation/current-simulation-time`)
+    httpClient.get(`${appConfig.thohHost}/time`)
     .subscribe({
         next: (response) => {
             const simCurrentTime = parseInt(response.data.currentSimulationTime + 10); // Offset by 10ms to account for minor network/request latency

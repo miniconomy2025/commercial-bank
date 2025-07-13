@@ -10,9 +10,10 @@ import { logger } from "../utils/logger";
 import { attemptInstalments } from "../queries/loans.queries";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 import { setLoanInterestRate } from "../queries/loans.queries";
-import { HttpClient } from "../utils/http-client";
-import { retry } from "rxjs";
+import { HttpClient, HttpClientResponse } from "../utils/http-client";
+import { catchError, firstValueFrom, map, Observable, of, retry } from "rxjs";
 import { resetDB } from "../queries/simulation.queries";
+import appConfig from "../config/app.config";
 
 const router = Router();
 const httpClient = new HttpClient();
@@ -25,23 +26,18 @@ router.post("/", async (req, res) => {
     try {
         const { epochStartTime } = snakeToCamelCaseMapper(req.body);
 
-        const balanceData = await getStartingBalance();
+        const balanceData = await firstValueFrom(getStartingBalance());
 
-        if (!epochStartTime || !balanceData) {
-          res.status(400).json({ error: "Bad Request: Missing required fields: starting_time, starting_balance, from_account_number" });
+        if (epochStartTime === undefined || balanceData === undefined) {
+          res.status(400).json({ error: "Invalid payload: epoch_start_time required" });
           return;
         }
 
-        const { investment_value, prime_rate } = balanceData;
-
-        if (!epochStartTime ) {
-            res.status(400).json({ error: "Bad Request: Missing required fields: starting_time, starting_balance, from_account_number" });
-            return;
-        }
+        const { investmentValue, primeRate } = snakeToCamelCaseMapper(balanceData);
 
         resetDB(epochStartTime);
 
-        setLoanInterestRate(Number(prime_rate))
+        setLoanInterestRate(Number(primeRate))
         const fromAccountNumber = await getAccountFromOrganizationUnit('thoh').then(account => account?.accountNumber);
         initSimulation(epochStartTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
         const toAccountNumber = await getAccountFromOrganizationUnit('commercial-bank').then(account => account?.accountNumber);
@@ -49,7 +45,7 @@ router.post("/", async (req, res) => {
             res.status(404).json({ error: "Commercial bank account not found" });
             return;
         }
-        await createTransaction(fromAccountNumber!, toAccountNumber, investment_value, `Simulation start with balance ${investment_value}`, 'thoh', 'commercial-bank');
+        await createTransaction(fromAccountNumber!, toAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
         res.status(200).send(getDateTimeAsISOString());
     } catch (error) {
         logger.error("Error starting simulation:", error);
@@ -57,24 +53,18 @@ router.post("/", async (req, res) => {
     }
 });
 
-const getStartingBalance = async (): Promise<{prime_rate:number, investment_value:number} | undefined> => {
-  try {
-    httpClient.get('https://thoh-api.projects.bbdgrad.com/api/bank/initialization').pipe(
-        retry(3) // Retry up to 3 times on failure
-    ).subscribe({
-        next: (data) => {
-            return data
-        },
-        error: (error) => {
-            console.log('Error fetching starting balance:', error);
-            return undefined;
-        },
-    });
-    return undefined;
-  } catch (error) {
-    console.log('Error fetching starting balance:', error);
-    return undefined;
-  }
+const getStartingBalance = (): Observable<{ prime_rate: number; investment_value: number } | undefined> => {
+  return httpClient.get(`${appConfig.thohHost}/bank/initialization`).pipe(
+    retry(3),
+    map((res: HttpClientResponse) => {
+      if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+        return res.data as { prime_rate: number; investment_value: number };
+      } else {
+        return { prime_rate: 0.01, investment_value: 1000000000 }; // Default values if the request fails
+      }
+    }),
+    catchError(() => of({ prime_rate: 0.01, investment_value: 1000000000 }))
+  );
 };
 
 router.delete("/", async (req, res) => {
