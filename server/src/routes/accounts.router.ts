@@ -19,6 +19,7 @@ import {
   Post_InterbankTransfer_Res,
 } from '../types/endpoint.types';
 import db from '../config/db.config';
+import { accountMiddleware } from '../middlewares/auth.middleware';
 
 //=============== /account ==============//
 
@@ -90,7 +91,7 @@ router.post('/interbank-transfer', async (req: Request<{}, {}, Post_InterbankTra
   }
 } );
 
-router.get('/me/balance', async (req: Request, res: Response) => {
+router.get('/me/balance', accountMiddleware, async (req: Request, res: Response) => {
   try {
     const accountNumber = req.account?.accountNumber;
     if (!accountNumber) {
@@ -109,7 +110,7 @@ router.get('/me/balance', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/me/frozen', async (req: Request, res: Response) => {
+router.get('/me/frozen', accountMiddleware, async (req: Request, res: Response) => {
   try {
     const accountNumber = req.account?.accountNumber;
     if (!accountNumber) {
@@ -143,7 +144,7 @@ function isValidUrl(urlString?: string): boolean {
 router.post('/account/me/notify', async (req: Request<{}, {}, Post_AccountMeNotify_Req>, res: Response<Post_AccountMeNotify_Res>) => {
   try {
     const { notification_url } = req.body;
-    const teamId = req.account?.teamId;
+    const teamId = req.teamId;
 
     if (!notification_url || !isValidUrl(notification_url)) { // FIX: Validate URL format
       res.status(400).json({ success: false, error: 'invalidNotificationUrl' });
