@@ -11,7 +11,7 @@ export const resetDB = async (time: number): Promise<void> => {
     INSERT INTO accounts (account_number, team_id, notification_url, created_at)
     VALUES 
       (generate_unique_account_number(), 'commercial-bank', 'api/notify', $1),
-      ($2, 'thoh', 'api/notify', $1)
-  `, [time, appConfig.thohAccountNumber]);
+      ($2, 'thoh', $3, $1)
+  `, [time, appConfig.thohAccountNumber, `${appConfig.thohHost}/orders/payments`]);
 };
 
