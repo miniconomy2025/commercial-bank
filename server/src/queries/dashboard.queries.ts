@@ -32,7 +32,7 @@ export const getAllExistingTransactions = async (account: string | undefined): P
 };
 
 export const getAllExistingAccounts = async (): Promise<AccountInfo[]> => {
-  return await db.many(`
+  return await db.manyOrNone(`
     SELECT 
       a.id,
       a.account_number as account_number,
