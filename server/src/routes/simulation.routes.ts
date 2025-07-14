@@ -35,7 +35,7 @@ router.post("/", async (req, res) => {
 
         const { investmentValue, primeRate } = snakeToCamelCaseMapper(balanceData);
 
-        resetDB(epochStartTime);
+        await resetDB(epochStartTime);
 
         setLoanInterestRate(Number(primeRate));
         setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);
