@@ -53,7 +53,7 @@ router.post("/", async (req, res) => {
         await createTransaction(toAccountNumber, fromAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
         res.status(200).send(`${appConfig.thohHost}/orders/payments`);
     } catch (error) {
-        logger.error("Error starting simulation:", error);
+        console.log("Error starting simulation:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
