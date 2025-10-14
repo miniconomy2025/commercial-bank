@@ -1,6 +1,9 @@
-.direnv
+.direnv/
+.ignore/
+.vscode/
+
 *.toml
-.vscode
+
 flyway/report.html
 flyway/report.json
 flyway/flyway.conf
