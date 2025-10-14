@@ -1,6 +1,6 @@
 import { ITask } from "pg-promise";
 import db from "../config/db.config";
-import { Post_Account_Res } from "../types/endpoint.types";
+import { AccountInfo, Post_Account_Res } from "../types/endpoint.types";
 
 export const getCommercialBankAccountRefId = async (t?: ITask<{}>): Promise<number | null> =>
   (await (t ?? db).oneOrNone(`SELECT id FROM account_refs WHERE team_id = 'commercial-bank' LIMIT 1`))?.id ?? null;
@@ -41,7 +41,6 @@ export const createAccount = async (
     }
 }
 
-export type AccountInfo = { net_balance: number; account_number: string; notification_url: string; };
 export const getAccountInformation = async (teamId: string): Promise<AccountInfo | null> => {
   try {
     const accountInformation = await db.oneOrNone<AccountInfo>(

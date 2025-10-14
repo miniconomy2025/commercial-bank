@@ -22,6 +22,8 @@ export type BankId = "commercial-bank" | "retail-bank" | "thoh";
 
 //-------------------- /account --------------------//
 
+export type AccountInfo = { net_balance: number; account_number: string; notification_url: string; };
+
 // POST /account
 export type Post_Account_Req = { notification_url?: string; };
 export type Post_Account_Res = SimpleResult<
@@ -32,7 +34,7 @@ export type Post_Account_Res = SimpleResult<
 // GET /account/me
 export type Get_AccountMe_Req = {};
 export type Get_AccountMe_Res = SimpleResult<
-    { account_number: string },
+    AccountInfo,
     "accountNotFound" | "internalError"
 >;
 

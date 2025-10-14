@@ -1,7 +1,7 @@
 // TODO: Add this file to API spec
 // TODO: Add types for request and response in endpoint.types.ts
 
-import { Router, Response } from "express";
+import { Router } from "express";
 import { snakeToCamelCaseMapper } from "../utils/mapper";
 import { endSimulation, getDateTimeAsISOString, getSimTime, initSimulation } from "../utils/time";
 import { createTransaction } from "../queries/transactions.queries";
@@ -35,7 +35,7 @@ router.post("/", async (req, res) => {
 
         const { investmentValue, primeRate } = snakeToCamelCaseMapper(balanceData);
 
-        await resetDB(epochStartTime);
+        resetDB(epochStartTime);
 
         setLoanInterestRate(Number(primeRate));
         setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);

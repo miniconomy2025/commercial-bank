@@ -3,3 +3,4 @@
 .vscode
 flyway/report.html
 flyway/report.json
+flyway/flyway.conf

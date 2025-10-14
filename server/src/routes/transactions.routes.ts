@@ -110,7 +110,6 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
       return;
     }
 
-    // FIX: Notification payload must include all required fields
     const notificationPayload = {
       transaction_number: newTransaction.transaction_number,
       status: newTransaction.status,

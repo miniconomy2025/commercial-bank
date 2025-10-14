@@ -44,13 +44,8 @@ router.get('/me', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<
 router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Post_Account_Res>) => {
   try {
     const createdAt = getSimTime();
-    const { notification_url } = req.body;
+    const notification_url = req.body?.notification_url ?? "";
     const teamId = req.teamId;
-
-    if (!notification_url) {
-      res.status(400).json({ success: false, error: 'invalidPayload' });
-      return;
-    }
 
     const newAccount = await createAccount(createdAt, notification_url, teamId ?? '');
 

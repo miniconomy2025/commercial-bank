@@ -5,10 +5,9 @@ import db from '../config/db.config';
 
 //=============== /interbank ==============//
 
-const router = Router()
+const router = Router();
 
 // Send money to us from another bank
-// FIX: Add full validation for interbank transfer
 router.post("/transfer", async (req: Request<{}, {}, Post_InterbankTransfer_Req>, res: Response<Post_InterbankTransfer_Res>) => {
   if (req.teamId !== 'retail-bank') {
     res.status(403).json({ success: false, error: "transferNotPermitted" });

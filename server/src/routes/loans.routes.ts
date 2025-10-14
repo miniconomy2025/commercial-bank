@@ -83,7 +83,6 @@ router.get("/", async (req: Request<{}, {}, Get_Loan_Req>, res: Response<Get_Loa
 
 // Repay loan
 // NOTE: Any account can contribute to the repayment of a loan on any other account
-// FIX: Add full validation for loan repayment
 router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }, {}, Post_LoanNumberPay_Req>, res: Response<Post_LoanNumberPay_Res>) => {
   const { amount } = req.body;
   if (!amount || isNaN(amount) || amount <= 0) {
@@ -150,6 +149,7 @@ router.get("/:loan_number", async (req: Request<{ loan_number: string }>, res: R
 // NOTE: only the hand can update this
 router.post("/prime_rate",async (req,res) =>{
   const teamId = req.teamId
+
   const {prime_rate} = req.body;
   if (teamId!=="thoh"){
     res.status(400).json("Only the hand can change the prime rate");
