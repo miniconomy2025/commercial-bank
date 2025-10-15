@@ -1,0 +1,11 @@
+FROM node:18-alpine
+
+RUN apk add --no-cache curl
+RUN npm install -g pnpm
+
+WORKDIR /test-runner
+
+COPY wait-and-test.sh ./
+RUN chmod +x wait-and-test.sh
+
+CMD ["./wait-and-test.sh"]

@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import transactionsRouter from './routes/transactions.routes';
 import accountsRouter from './routes/accounts.router';
 import loansRouter from './routes/loans.routes';
@@ -8,7 +9,13 @@ import DashboardRouter from './routes/dashboard.routes'
 import interbankTransfer from './routes/interbank.routes';
 
 const app = express();
+app.use(cors());
 app.use(express.json());
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 app.use('/api/account', authMiddleware, accountsRouter);
 app.use('/api/transaction', authMiddleware, accountMiddleware, transactionsRouter);

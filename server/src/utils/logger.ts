@@ -13,7 +13,7 @@ const colors: Record<LogLevel, string> = {
 const reset = '\x1b[0m';
 
 const log = (level: LogLevel, ...args: unknown[]) => {
-  if (!appConfig.isDev) return;
+  if (!(appConfig.isDev || appConfig.isTest)) return;
 
   const tag = level.toUpperCase();
   const color = colors[level];

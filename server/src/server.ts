@@ -3,23 +3,32 @@ import appConfig from './config/app.config';
 import { logger } from './utils/logger';
 import fs from 'fs';
 import https from 'https';
-import { rootCertificates } from 'tls';
+import http from 'http';
+// import { rootCertificates } from 'tls';
 
 const PORT = process.env.PORT;
 
-const options = {
-  key: fs.readFileSync(appConfig.keyPath!),
-  cert: fs.readFileSync(appConfig.certPath!),
-  ca: [
-    ...rootCertificates,
-    fs.readFileSync(appConfig.caPath!),
-  ],
-  requestCert: true,
-  rejectUnauthorized: true
-};
+// Use HTTP for test environment, HTTPS for others
+if (process.env.NODE_ENV === 'test') {
+  http.createServer(app).listen(PORT, () => {
+    logger.info(`Server is running in ${appConfig.env} mode on port ${PORT} (HTTP)`);
+  });
+} else {
+  const options = {
+    // REMOVED: No mTLS for now
+    // key: fs.readFileSync(appConfig.keyPath!),
+    // cert: fs.readFileSync(appConfig.certPath!),
+    // ca: [
+    //   ...rootCertificates,
+    //   fs.readFileSync(appConfig.caPath!),
+    // ],
+    // requestCert: true,
+    // rejectUnauthorized: true
+  };
 
-https.createServer(options, app).listen(PORT, () => {
-  logger.info(`Server is running in ${appConfig.env} mode on port ${PORT}`);
-});
+  https.createServer(options, app).listen(PORT, () => {
+    logger.info(`Server is running in ${appConfig.env} mode on port ${PORT} (HTTPS)`);
+  });
+}
 
 

@@ -1,6 +1,7 @@
 .direnv/
 .ignore/
 .vscode/
+.pnpm-store/
 
 *.toml
 

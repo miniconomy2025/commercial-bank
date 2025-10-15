@@ -17,12 +17,13 @@ export class HttpClient {
 
   constructor() {
     this.httpsAgent = new https.Agent({
-      key: fs.readFileSync(appConfig.keyPath!),
-      cert: fs.readFileSync(appConfig.certPath!),
-      ca: [
-        ...rootCertificates,
-        fs.readFileSync(appConfig.caPath!),
-      ],
+      // REMOVED: No mTLS for now
+      // key: fs.readFileSync(appConfig.keyPath!),
+      // cert: fs.readFileSync(appConfig.certPath!),
+      // ca: [
+      //   ...rootCertificates,
+      //   fs.readFileSync(appConfig.caPath!),
+      // ],
       rejectUnauthorized: true,
     });
   }

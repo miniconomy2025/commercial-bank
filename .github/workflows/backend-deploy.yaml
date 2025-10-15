@@ -77,9 +77,9 @@ jobs:
             NODE_ENV=production
             PORT=443
             DATABASE_URL=${{ secrets.DATABASE_URL }}
-            CA_CERT_PATH=ca.crt
-            SERVER_KEY_PATH=server.key
-            SERVER_CERT_PATH=server.crt
+            # CA_CERT_PATH=ca.crt
+            # SERVER_KEY_PATH=server.key
+            # SERVER_CERT_PATH=server.crt
             TIMEOUT=6000
             CLIENT_ID=${{ secrets.CLIENT_ID }}
             EOF
