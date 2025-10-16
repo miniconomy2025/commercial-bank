@@ -23,7 +23,7 @@ jobs:
       - name: Install frontend dependencies and build
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
 
       - name: Copy frontend build to EC2
@@ -102,7 +102,7 @@ jobs:
                 }
 
                 location /api/ {
-                    proxy_pass https://commercial-bank-api.projects.bbdgrad.com;
+                    proxy_pass https://commercial-bank-api.subspace.site;
 
                     proxy_ssl_certificate /home/ec2-user/certs/certs/client.crt;
                     proxy_ssl_certificate_key /home/ec2-user/certs/certs/client.key;
