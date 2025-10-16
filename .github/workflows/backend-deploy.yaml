@@ -103,6 +103,16 @@ jobs:
             mkdir -p dist
             rsync -av --exclude='src' --exclude='node_modules' --exclude='dist' ./ dist/
 
+            echo "--- Installing Certbot and requesting SSL certificate ---"
+            if ! command -v certbot &> /dev/null; then
+              sudo yum install -y epel-release || true
+              sudo yum install -y certbot python3-certbot-nginx || sudo apt install -y certbot python3-certbot-nginx
+            fi
+
+            sudo certbot --standalone --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$API_DOMAIN"
+
+            echo "Backend deployed with HTTPS at https://$API_DOMAIN"
+
             # Start/restart the app with PM2
             echo "Starting/Restarting commercial-bank-api with PM2..."
             cd dist
@@ -113,15 +123,5 @@ jobs:
               pm2 start server.js --name commercial-bank-api
             fi
             pm2 save
-
-            echo "--- Installing Certbot and requesting SSL certificate ---"
-            if ! command -v certbot &> /dev/null; then
-              sudo yum install -y epel-release || true
-              sudo yum install -y certbot python3-certbot-nginx || sudo apt install -y certbot python3-certbot-nginx
-            fi
-
-            sudo certbot --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$API_DOMAIN"
-
-            echo "Frontend deployed with HTTPS at https://$API_DOMAIN"
 
             echo "Deployment complete."
