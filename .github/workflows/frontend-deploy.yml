@@ -23,7 +23,7 @@ jobs:
       - name: Install frontend dependencies and build
         run: |
           cd frontend
-          npm install
+          npm install --legacy-peer-deps
           npm run build
 
       - name: Copy frontend build to EC2
