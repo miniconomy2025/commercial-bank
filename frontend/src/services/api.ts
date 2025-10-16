@@ -11,6 +11,7 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Client-Id': 'Commercial-Bank'
       },
     });
 

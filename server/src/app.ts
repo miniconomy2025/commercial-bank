@@ -16,13 +16,13 @@ app.use(express.json());
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
-
-app.use('/api/account', authMiddleware, accountsRouter);
-app.use('/api/transaction', authMiddleware, accountMiddleware, transactionsRouter);
-app.use('/api/loan', authMiddleware, accountMiddleware, loansRouter);
-app.use('/simulation', authMiddleware, simulationMiddleware,SimulationRouter);
+app.use(authMiddleware);
+app.use('/api/account', accountsRouter);
+app.use('/api/transaction', accountMiddleware, transactionsRouter);
+app.use('/api/loan', accountMiddleware, loansRouter);
+app.use('/simulation', simulationMiddleware,SimulationRouter);
 app.use('/api/dashboard', dashboardMiddleware, DashboardRouter);
-app.use('/api/interbank', authMiddleware, interbankTransfer);
+app.use('/api/interbank', interbankTransfer);
 
 
 export default app;
