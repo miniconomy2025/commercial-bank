@@ -14,6 +14,8 @@ if (process.env.NODE_ENV === 'test') {
     logger.info(`Server is running in ${appConfig.env} mode on port ${PORT} (HTTP)`);
   });
 } else {
+  const domain = process.env.API_DOMAIN || 'example.com';
+  const certPath = `/etc/letsencrypt/live/${domain}`;
   const options = {
     // REMOVED: No mTLS for now
     // key: fs.readFileSync(appConfig.keyPath!),
@@ -24,6 +26,8 @@ if (process.env.NODE_ENV === 'test') {
     // ],
     // requestCert: true,
     // rejectUnauthorized: true
+      key: fs.readFileSync(`${certPath}/privkey.pem`),
+      cert: fs.readFileSync(`${certPath}/fullchain.pem`)
   };
 
   https.createServer(options, app).listen(PORT, () => {

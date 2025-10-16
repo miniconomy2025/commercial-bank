@@ -82,6 +82,7 @@ jobs:
             # SERVER_CERT_PATH=server.crt
             TIMEOUT=6000
             CLIENT_ID=${{ secrets.CLIENT_ID }}
+            API_DOMAIN=${{ vars.API_DOMAIN }}
             EOF
 
             # Install app dependencies
@@ -112,5 +113,15 @@ jobs:
               pm2 start server.js --name commercial-bank-api
             fi
             pm2 save
+
+            echo "--- Installing Certbot and requesting SSL certificate ---"
+            if ! command -v certbot &> /dev/null; then
+              sudo yum install -y epel-release || true
+              sudo yum install -y certbot python3-certbot-nginx || sudo apt install -y certbot python3-certbot-nginx
+            fi
+
+            sudo certbot --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$API_DOMAIN"
+
+            echo "Frontend deployed with HTTPS at https://$API_DOMAIN"
 
             echo "Deployment complete."
