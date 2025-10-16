@@ -1,4 +1,5 @@
-const BASE_URL = 'https://commercial-bank.projects.bbdgrad.com/api';
+// const BASE_URL = 'https://commercial-bank.projects.bbdgrad.com/api';
+const BASE_URL = 'https://commercial-bank.subspace.site/api';
 
 const urlParams = new URLSearchParams(window.location.search);
 const clientId = urlParams.get('clientId');
