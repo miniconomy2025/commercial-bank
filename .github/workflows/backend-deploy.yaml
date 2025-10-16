@@ -112,9 +112,11 @@ jobs:
 
             sudo certbot certonly --standalone --non-interactive --agree-tos --email "$CERTBOT_EMAIL" -d "$API_DOMAIN"
 
-            sudo chmod 644 /etc/letsencrypt/live/$API_DOMAIN/fullchain.pem
-            sudo chmod 644 /etc/letsencrypt/live/$API_DOMAIN/privkey.pem
-            sudo chown -R $USER:$USER /etc/letsencrypt/live/$API_DOMAIN/
+            sudo mkdir -p /home/ec2-user/certs
+            sudo cp /etc/letsencrypt/live/$API_DOMAIN/privkey.pem /home/ec2-user/certs/
+            sudo cp /etc/letsencrypt/live/$API_DOMAIN/fullchain.pem /home/ec2-user/certs/
+
+            sudo chown -R ec2-user:ec2-user /home/ec2-user/certs/
 
             echo "Backend deployed with HTTPS at https://$API_DOMAIN"
 
