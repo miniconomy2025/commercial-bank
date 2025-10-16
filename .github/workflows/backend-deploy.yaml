@@ -47,6 +47,7 @@ jobs:
           script: |
             API_DOMAIN="${{ vars.API_DOMAIN }}"
             APP_DIR="/home/${{ vars.EC2_USER }}/cb-api-server/server"
+            CERTBOT_EMAIL="${{ secrets.CERTBOT_EMAIL }}"
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
             echo "--- Deploying to EC2: $(pwd) ---"
