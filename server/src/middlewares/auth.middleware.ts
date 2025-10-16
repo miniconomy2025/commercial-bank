@@ -73,15 +73,15 @@ export function simulationMiddleware(req: Request, res: Response, next: NextFunc
 }
 
 export function dashboardMiddleware(req: Request, res: Response, next: NextFunction) {
-  const dashboardId = req.query.clientId;
-  if (!dashboardId) {
-    res.status(400).json({ error: 'Dashboard ID is required' });
-    return;
-  }
-  if (dashboardId !== appConfig.clientId) {
-    res.status(400).json({ error: 'Invalid dashboard ID' });
-    return;
-  }
+  // const dashboardId = req.query.clientId;
+  // if (!dashboardId) {
+  //   res.status(400).json({ error: 'Dashboard ID is required' });
+  //   return;
+  // }
+  // if (dashboardId !== appConfig.clientId) {
+  //   res.status(400).json({ error: 'Invalid dashboard ID' });
+  //   return;
+  // }
 
   next();
 }
