@@ -26,7 +26,7 @@ export FORCE_COLOR=1
 printf "\n\033[1;34m===== BACKEND TESTS =====\033[0m\n"
 cd /server
 CI=true pnpm install
-CI=true pnpm test
+CI=true pnpm test-env
 
 # Run frontend tests
 printf "\n\033[1;32m===== FRONTEND TESTS =====\033[0m\n"

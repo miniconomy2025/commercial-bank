@@ -17,8 +17,10 @@ export const doesAccountExist = async (teamId: string): Promise<boolean> => {
   return !!account;
 };
 
-export const getAccountBalance = async (accountNumber: string, t?: ITask<{}>): Promise<number | null> =>
-  (await (t ?? db).oneOrNone(`SELECT * FROM get_account_balance($1) AS balance`, [accountNumber]))?.balance ?? null;
+export const getAccountBalance = async (accountNumber: string, t?: ITask<{}>): Promise<number | null> => {
+  const bal = (await (t ?? db).oneOrNone(`SELECT * FROM get_account_balance($1) AS balance`, [accountNumber]))?.balance;
+  return bal == null ? null : parseFloat(bal);
+}
 
 export const createAccount = async (
     createdAt: number,
@@ -26,10 +28,16 @@ export const createAccount = async (
     teamId: string
 ): Promise<Post_Account_Res> => {
     try {
+        // Check if account already exists
+        if (await doesAccountExist(teamId)) {
+          return { success: false, error: "accountAlreadyExists" };
+        }
+
         const result = await db.oneOrNone<{ create_account: string }>(
           'SELECT create_account($1, $2, $3)',
           [createdAt, notificationUrl, teamId]
         );
+        
         if (!result || !result.create_account) {
           return { success: false, error: "internalError" };
         }

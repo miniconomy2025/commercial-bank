@@ -7,7 +7,8 @@
     "start": "NODE_ENV=production node dist/server.js",
     "dev": "NODE_ENV=development ts-node-dev --respawn --transpile-only src/server.ts",
     "debug": "npm run dev",
-    "test": "jest",
+    "test": "flyway -configFiles=../flyway/flyway.conf -locations=filesystem:../flyway -target=6 clean migrate ; NODE_ENV=development jest",
+    "test-env": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
