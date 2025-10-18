@@ -33,7 +33,6 @@ describe('accounts.queries', () => {
   describe('createAccount', () => {
     it('should create account with valid team ID', async () => {
       const result = await createAccount(1700000100, 'http://new-team.com/notify', 'new-team');
-      console.log(result);
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -62,7 +61,7 @@ describe('accounts.queries', () => {
   describe('getAccountBalance', () => {
     it('should return balance for existing account with transactions', async () => {
       const balance = await getAccountBalance('200000000001');
-      expect(balance).toBe(300.75);
+      expect(balance).toBe(900.75);
     });
 
     it('should return null for non-existing account', async () => {
@@ -72,7 +71,7 @@ describe('accounts.queries', () => {
 
     it('should return negative balance for account with more outgoing', async () => {
       const balance = await getAccountBalance('200000000002');
-      expect(balance).toBe(214.50);
+      expect(balance).toBe(-385.50);
     });
 
     it('should return zero balance for account with no transactions', async () => {
