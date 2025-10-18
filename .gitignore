@@ -2,6 +2,7 @@
 .ignore/
 .vscode/
 .pnpm-store/
+server/coverage/
 
 *.toml
 

@@ -8,21 +8,16 @@ describe('accounts.queries', () => {
     try {
       await db.oneOrNone('SELECT 1');
       dbAvailable = true;
-    } catch (error) {
-      console.warn('Database not available for testing, skipping database tests');
     }
+    catch (error) { console.warn('Database not available for testing, skipping database tests'); }
   });
 
   afterAll(async () => {
-    if (dbAvailable) {
-      await db.$pool.end();
-    }
+    if (dbAvailable) { await db.$pool.end(); }
   });
 
   beforeEach(() => {
-    if (!dbAvailable) {
-      pending('Database not available');
-    }
+    if (!dbAvailable) { pending('Database not available'); }
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -49,6 +44,9 @@ describe('accounts.queries', () => {
     });
 
     it('should handle duplicate account creation', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       const result = await createAccount(1700000101, 'http://duplicate.com/notify', 'team-001');
 
       expect(result.success).toBe(false);
@@ -60,21 +58,33 @@ describe('accounts.queries', () => {
 
   describe('getAccountBalance', () => {
     it('should return balance for existing account with transactions', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       const balance = await getAccountBalance('200000000001');
       expect(balance).toBe(900.75);
     });
 
     it('should return null for non-existing account', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       const balance = await getAccountBalance('999999999999');
       expect(balance).toBeNull();
     });
 
     it('should return negative balance for account with more outgoing', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       const balance = await getAccountBalance('200000000002');
       expect(balance).toBe(-385.50);
     });
 
     it('should return zero balance for account with no transactions', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       // Create a new account with no transactions
       const createResult = await createAccount(1700000102, 'http://test.com/notify', 'test-zero-balance');
       if (createResult.success) {
@@ -86,6 +96,9 @@ describe('accounts.queries', () => {
 
   describe('updateAccountNotificationUrl', () => {
     it('should update notification URL with valid URL', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       await updateAccountNotificationUrl('team-001', 'https://updated-url.com/webhook');
 
       // Verify the URL was updated in database
@@ -97,6 +110,9 @@ describe('accounts.queries', () => {
     });
 
     it('should update with HTTP URL', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       await updateAccountNotificationUrl('team-002', 'http://localhost:3000/notify');
 
       // Verify the URL was updated in database
@@ -108,6 +124,9 @@ describe('accounts.queries', () => {
     });
 
     it('should handle non-existing team ID', async () => {
+      if (!dbAvailable) {
+        return;
+      }
       // This should not throw an error, just update 0 rows
       await expect(updateAccountNotificationUrl('nonexistent-team', 'http://example.com'))
         .resolves.not.toThrow();

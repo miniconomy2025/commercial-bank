@@ -7,11 +7,11 @@
     "start": "NODE_ENV=production node dist/server.js",
     "dev": "NODE_ENV=development ts-node-dev --respawn --transpile-only src/server.ts",
     "debug": "npm run dev",
-    "test": "NODE_ENV=development jest --setupFilesAfterEnv=./jest.setup.ts --runInBand --detectOpenHandles",
-    "test-env": "jest",
-    "test-old": "flyway -configFiles=../flyway/flyway.conf -locations=filesystem:../flyway -target=6 clean migrate ; NODE_ENV=development jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "NODE_ENV=development jest --setupFilesAfterEnv=./jest.setup.ts --runInBand",
+    "test-env": "jest --setupFilesAfterEnv=./jest.setup.ts --runInBand",
+    "test:watch": "NODE_ENV=development jest --watch --setupFilesAfterEnv=./jest.setup.ts --runInBand",
+    "test:coverage": "NODE_ENV=development jest --coverage --setupFilesAfterEnv=./jest.setup.ts --runInBand",
+    "test-old": "flyway -configFiles=../flyway/flyway.conf -locations=filesystem:../flyway -target=6 clean migrate ; NODE_ENV=development jest"
   },
   "keywords": [],
   "author": "",

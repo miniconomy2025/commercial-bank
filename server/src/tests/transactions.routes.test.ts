@@ -10,21 +10,16 @@ describe('transactions.routes integration tests', () => {
     try {
       await db.oneOrNone('SELECT 1');
       dbAvailable = true;
-    } catch (error) {
-      console.warn('Database not available for testing, skipping database tests');
     }
+    catch (error) { console.warn('Database not available for testing, skipping database tests'); }
   });
 
   afterAll(async () => {
-    if (dbAvailable) {
-      await db.$pool.end();
-    }
+    if (dbAvailable) { await db.$pool.end(); }
   });
 
   beforeEach(() => {
-    if (!dbAvailable) {
-      pending('Database not available');
-    }
+    if (!dbAvailable) { pending('Database not available'); }
   });
 
   describe('POST /api/transaction - Transaction processing with balance updates', () => {
