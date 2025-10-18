@@ -16,35 +16,35 @@ declare global {
 }
 
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+// export function authMiddleware(req: Request, res: Response, next: NextFunction) {
 
-  let cert;
-  const socket: Socket = req.socket;
+//   let cert;
+//   const socket: Socket = req.socket;
 
-  if(socket instanceof TLSSocket && socket.authorized) {
-    cert = socket.getPeerCertificate()
-  } else {
-    res.status(403).json({ error: 'Tls certificate is required' });
-    return;
-  };
+//   if(socket instanceof TLSSocket && socket.authorized) {
+//     cert = socket.getPeerCertificate()
+//   } else {
+//     res.status(403).json({ error: 'Tls certificate is required' });
+//     return;
+//   };
 
-  try {
-    const organizationUnit = cert.subject.OU;
-    if (!organizationUnit) {
-      res.status(403).json({ error: 'Organization unit is required in the certificate' });
-      return;
-    }
-    req.teamId= organizationUnit;
+//   try {
+//     const organizationUnit = cert.subject.OU;
+//     if (!organizationUnit) {
+//       res.status(403).json({ error: 'Organization unit is required in the certificate' });
+//       return;
+//     }
+//     req.teamId= organizationUnit;
     
-    next();
-  } catch (error) {
-    logger.error('Certificate processing error:', error);
-    res.status(500).json({ 
-      error: 'Certificate processing failed',
-      details: (error as Error).message 
-    });
-  }
-}
+//     next();
+//   } catch (error) {
+//     logger.error('Certificate processing error:', error);
+//     res.status(500).json({ 
+//       error: 'Certificate processing failed',
+//       details: (error as Error).message 
+//     });
+//   }
+// }
 
 export async function accountMiddleware(req: Request, res: Response, next: NextFunction) {
   try {
@@ -73,15 +73,26 @@ export function simulationMiddleware(req: Request, res: Response, next: NextFunc
 }
 
 export function dashboardMiddleware(req: Request, res: Response, next: NextFunction) {
-  const dashboardId = req.query.clientId;
-  if (!dashboardId) {
-    res.status(400).json({ error: 'Dashboard ID is required' });
-    return;
-  }
-  if (dashboardId !== appConfig.clientId) {
-    res.status(400).json({ error: 'Invalid dashboard ID' });
-    return;
-  }
+  // const dashboardId = req.query.clientId;
+  // if (!dashboardId) {
+  //   res.status(400).json({ error: 'Dashboard ID is required' });
+  //   return;
+  // }
+  // if (dashboardId !== appConfig.clientId) {
+  //   res.status(400).json({ error: 'Invalid dashboard ID' });
+  //   return;
+  // }
 
   next();
+}
+
+export function authMiddleware(req: Request, res: Response, next: NextFunction){
+  const clientId = req.headers['client-id'] as string;
+  if (!clientId) {
+    res.status(401).json({error: 'Invalid Client-Id header'})
+  } else {
+    logger.info(`Client-Id: ${clientId}`)
+    req.teamId = clientId;
+    next();
+  }
 }

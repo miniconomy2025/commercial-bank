@@ -24,7 +24,7 @@ export class HttpClient {
       //   ...rootCertificates,
       //   fs.readFileSync(appConfig.caPath!),
       // ],
-      rejectUnauthorized: true,
+      rejectUnauthorized: false,
     });
   }
 
@@ -38,7 +38,9 @@ export class HttpClient {
     const {
       url,
       method = "GET",
-      headers = {},
+      headers = {
+        'Client-Id': 'Commercial-Bank'
+      },
       body,
       timeoutMs = appConfig.timeout,
     } = options;
