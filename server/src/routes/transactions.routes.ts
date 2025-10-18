@@ -74,8 +74,8 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
 
   // Validation: sufficient funds and frozen status
   const accountStatus = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen, get_account_balance($1) AS balance', [from_account_number]);
-  if (!accountStatus)                 { res.status(404).json({ success: false, error: "accountNotFound" }); return; }
-  if (accountStatus.frozen)           { res.status(422).json({ success: false, error: "accountFrozen" }); return; }
+  if (!accountStatus)                 { res.status(404).json({ success: false, error: "accountNotFound"   }); return; }
+  if (accountStatus.frozen)           { res.status(422).json({ success: false, error: "accountFrozen"     }); return; }
   if (accountStatus.balance < amount) { res.status(422).json({ success: false, error: "insufficientFunds" }); return; }
 
   // Validation: if to_bank_name is commercial-bank, check account exists
@@ -134,14 +134,10 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
         // Send notification
         const notificationUrl = await getAccountNotificationUrl(to_account_number);
 
-        if (notificationUrl != null && isValidUrl(notificationUrl)) {
+        if (appConfig.isProd && notificationUrl != null && isValidUrl(notificationUrl)) {
           httpClient.post(notificationUrl!, notificationPayload).subscribe({
-            next: (response) => {
-              logger.info("Notification sent successfully:", response);
-            },
-            error: (error) => {
-              logger.info("Error sending notification:", error);
-            }
+            next: (response) => { logger.info("Notification sent successfully:", response); },
+            error: (error) => { logger.info("Error sending notification:", error); }
           });
         }
       break;
@@ -165,12 +161,13 @@ router.get("/:id", async (req, res: Response<Get_TransactionNumber_Res>) => {
 
   try {
     const transaction = await getTransactionById(id);
-    if (transaction) {
-      res.status(200).json({ success: true, transaction });
-    } else {
-      res.status(404).json({ success: false, error: "transactionNotFound" });
-    }
-  } catch (error) {
+
+    if (transaction == null)
+      { res.status(404).json({ success: false, error: "transactionNotFound" }); return; }
+
+    res.status(200).json({ success: true, transaction });
+  }
+  catch (error) {
     logger.error("Error fetching transaction:", error);
     res.status(500).json({ success: false, error: "internalError" });
   }

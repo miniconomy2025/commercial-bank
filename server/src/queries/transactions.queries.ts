@@ -92,7 +92,7 @@ export const createTransaction = async (
 
 
 export const getTransactionById = async (id: string): Promise<Transaction | null> => {
-  return db.oneOrNone(`SELECT
+  const res = await db.oneOrNone(`SELECT
     t.transaction_number,
     from_ref.account_number AS "from",
     to_ref.account_number AS "to",
@@ -105,4 +105,9 @@ export const getTransactionById = async (id: string): Promise<Transaction | null
   JOIN account_refs to_ref ON t."to" = to_ref.id
   JOIN transaction_statuses s ON t.status_id = s.id
   WHERE t.transaction_number =  $1`, [id]);
+
+  return res == null ? null : {
+    ...res,
+    amount: parseFloat(res.amount)
+  };
 }

@@ -71,10 +71,8 @@ export const getAccountInformation = async (teamId: string): Promise<AccountInfo
       WHERE a.team_id = $1;`,
       [teamId]
     );
-    
-    if (!result) return null;
-    
-    return {
+
+    return result == null ? null : {
       ...result,
       net_balance: parseFloat(result.net_balance),
     };

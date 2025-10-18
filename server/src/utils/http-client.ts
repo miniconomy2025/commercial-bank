@@ -1,4 +1,5 @@
 import https from "https";
+import http from "http";
 import { URL } from "url";
 import { Observable, throwError } from "rxjs";
 import { catchError, timeout } from "rxjs/operators";
@@ -35,6 +36,8 @@ export class HttpClient {
     body?: any;
     timeoutMs?: number;
   }): Observable<HttpClientResponse<T>> {
+    if (!appConfig.isProd) return new Observable(); // Only make external requests in prod
+
     const {
       url,
       method = "GET",
@@ -54,18 +57,21 @@ export class HttpClient {
     }
     const urlObj = new URL(url);
 
-    const httpsOptions: https.RequestOptions = {
+    const requestOptions = {
       method,
       headers,
-      agent: this.httpsAgent,
       hostname: urlObj.hostname,
       path: urlObj.pathname + urlObj.search,
-      protocol: urlObj.protocol,
-      port: urlObj.port || 443,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
     };
 
+    const isHttps = urlObj.protocol === 'https:';
+    if (isHttps) {
+      (requestOptions as any).agent = this.httpsAgent;
+    }
+
     return new Observable<HttpClientResponse<T>>((subscriber) => {
-      const req = https.request(httpsOptions, (res) => {
+      const req = (isHttps ? https : http).request(requestOptions, (res) => {
         let rawData = "";
 
         res.setEncoding("utf8");
@@ -95,6 +101,15 @@ export class HttpClient {
 
       req.on("error", (err) => {
         subscriber.error(this.wrapError(err, "Request failed"));
+      });
+
+      req.on("timeout", () => {
+        subscriber.error(
+          this.wrapError(
+            new Error(`Timeout after ${timeoutMs}ms`),
+            "Request timeout"
+          )
+        );
       });
 
       if (timeoutMs) {
