@@ -20,7 +20,7 @@ const router = Router()
 // Take out a loan
 router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_Loan_Res>) => {
   const { amount } = req.body;
-  const borrowerAccNo = req.account!.accountNumber;
+  const borrowerAccNo = req.account!.account_number;
 
   // Validation: amount >= 0
   if (!amount || isNaN(amount) || amount < 0) {
@@ -68,7 +68,7 @@ router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_
 // List all loans for the account
 // NOTE: Only the original borrower can get details for their loan
 router.get("/", async (req: Request<{}, {}, Get_Loan_Req>, res: Response<Get_Loan_Res>) => {
-  const accNo = req.account!.accountNumber;
+  const accNo = req.account!.account_number;
 
   try {
     const loanSummaries = await getLoanSummariesForAccount(accNo);
@@ -90,7 +90,7 @@ router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }, {}
     return;
   }
   const { loan_number } = req.params;
-  const accNo = req.account!.accountNumber;
+  const accNo = req.account!.account_number;
   // Validation: loan exists
   const loanId = await getLoanIdFromNumber(loan_number);
   if (!loanId) {
@@ -129,7 +129,7 @@ router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }, {}
 // NOTE: Only the account which took out the loan can get loan details
 router.get("/:loan_number", async (req: Request<{ loan_number: string }>, res: Response<Get_LoanNumber_Res>) => {
   const { loan_number } = req.params;
-  const accNo = req.account!.accountNumber;
+  const accNo = req.account!.account_number;
 
   try {
     const loanDetails = await getLoanDetails(loan_number, accNo);
@@ -152,10 +152,10 @@ router.post("/prime_rate",async (req,res) =>{
 
   const {prime_rate} = req.body;
   if (teamId!=="thoh"){
-    res.status(400).json("Only the hand can change the prime rate");
+    res.status(400).json({ success: false, error: "onlyThohCanChangePrimeRate" });
   } else {
     setLoanInterestRate(Number(prime_rate));
-    res.status(200).json({ status: "Prime rate updated successfully" ,prime_rate: prime_rate });
+    res.status(200).json({ success: true, prime_rate });
   }
 });
 

@@ -1,7 +1,7 @@
 export type Account = {
     id: number;
-    accountNumber: string;
-    teamId: string;
-    notificationUrl: string;
-    createdAt: number;
+    account_number: string;
+    team_id: string;
+    notification_url: string;
+    created_at: number;
 };

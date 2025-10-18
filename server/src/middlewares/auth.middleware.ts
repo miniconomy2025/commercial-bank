@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import { Account } from '../types/account.type';
-import { getAccountFromOrganizationUnit } from '../queries/auth.queries';
+import { getAccountFromTeamId } from '../queries/auth.queries';
 import { NextFunction, Request, Response } from 'express';
 import { TLSSocket } from 'tls';
 import { Socket } from 'net';
@@ -24,14 +24,14 @@ declare global {
 //   if(socket instanceof TLSSocket && socket.authorized) {
 //     cert = socket.getPeerCertificate()
 //   } else {
-//     res.status(403).json({ error: 'Tls certificate is required' });
+//     res.status(403).json({ success: false, error: 'tlsCertificateRequired' });
 //     return;
 //   };
 
 //   try {
 //     const organizationUnit = cert.subject.OU;
 //     if (!organizationUnit) {
-//       res.status(403).json({ error: 'Organization unit is required in the certificate' });
+//       res.status(403).json({ success: false, error: 'orgUnitRequiredInCertificate' });
 //       return;
 //     }
 //     req.teamId= organizationUnit;
@@ -40,7 +40,8 @@ declare global {
 //   } catch (error) {
 //     logger.error('Certificate processing error:', error);
 //     res.status(500).json({ 
-//       error: 'Certificate processing failed',
+//       success: false,
+//       error: 'certificateProcessingError',
 //       details: (error as Error).message 
 //     });
 //   }
@@ -49,23 +50,24 @@ declare global {
 export async function accountMiddleware(req: Request, res: Response, next: NextFunction) {
   try {
     const teamId = req.teamId;
-    const account = await getAccountFromOrganizationUnit(teamId!);
-    if (!account) {
-      res.status(404).json({ error: 'Account not found for the given organization unit' });
+    const account = await getAccountFromTeamId(teamId!);
+    if (account == null) {
+      res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
 
     req.account = account;
     next();
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Error fetching account:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ success: false, error: 'internalError' });
   }
 }
 
 export function simulationMiddleware(req: Request, res: Response, next: NextFunction) {
   if (req.teamId !== appConfig.thohTeamId) {
-    res.status(403).json({ error: "Forbidden: Only THOH can access this endpoint" });
+    res.status(403).json({ success: false, error: "forbiddenThohOnly" });
     return;
   }
 
@@ -75,11 +77,11 @@ export function simulationMiddleware(req: Request, res: Response, next: NextFunc
 export function dashboardMiddleware(req: Request, res: Response, next: NextFunction) {
   // const dashboardId = req.query.clientId;
   // if (!dashboardId) {
-  //   res.status(400).json({ error: 'Dashboard ID is required' });
+  //   res.status(400).json({ success: false, error: 'dashboardIdRequired' });
   //   return;
   // }
   // if (dashboardId !== appConfig.clientId) {
-  //   res.status(400).json({ error: 'Invalid dashboard ID' });
+  //   res.status(400).json({ success: false, error: 'invalidDashboardId' });
   //   return;
   // }
 
@@ -89,9 +91,9 @@ export function dashboardMiddleware(req: Request, res: Response, next: NextFunct
 export function authMiddleware(req: Request, res: Response, next: NextFunction){
   const clientId = req.headers['client-id'] as string;
   if (!clientId) {
-    res.status(401).json({error: 'Invalid Client-Id header'})
+    res.status(401).json({ success: false, error: 'invalidClientId' })
   } else {
-    logger.info(`Client-Id: ${clientId}`)
+    // logger.info(`Client-Id: ${clientId}`)
     req.teamId = clientId;
     next();
   }

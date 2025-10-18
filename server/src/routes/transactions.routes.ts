@@ -21,7 +21,7 @@ const httpClient = new HttpClient();
 
 router.get("/", async (req: Request<{}, {}, Get_Transaction_Req>, res: Response<Get_Transaction_Res>) => {
   try {
-    const from = req.account!.accountNumber;
+    const from = req.account!.account_number;
     const to = (req.query.to as string);
     const onlySuccessful = req.query.onlySuccessful === 'true';
     const transactions = await getAllTransactions(from, to, onlySuccessful);
@@ -44,7 +44,7 @@ function isValidUrl(urlString?: string): boolean {
 
 router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Response<Post_Transaction_Res>) => {
   const { to_account_number, amount, description, to_bank_name } = req.body;
-  const from_account_number = req.account!.accountNumber;
+  const from_account_number = req.account!.account_number;
 
   // Validation: amount > 0
   if (typeof amount !== 'number' || amount <= 0)

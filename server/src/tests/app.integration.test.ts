@@ -3,7 +3,7 @@ import express from 'express';
 
 const app = express();
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ success: true });
 });
 
 describe('App Integration', () => {
@@ -12,6 +12,6 @@ describe('App Integration', () => {
       .get('/health')
       .expect(200);
     
-    expect(response.body).toEqual({ status: 'ok' });
+    expect(response.body).toEqual({ success: true });
   });
 });

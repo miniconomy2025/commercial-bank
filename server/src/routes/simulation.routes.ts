@@ -5,7 +5,7 @@ import { Router } from "express";
 import { snakeToCamelCaseMapper } from "../utils/mapper";
 import { endSimulation, getDateTimeAsISOString, getSimTime, initSimulation } from "../utils/time";
 import { createTransaction } from "../queries/transactions.queries";
-import { getAccountFromOrganizationUnit } from "../queries/auth.queries";
+import { getAccountFromTeamId } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
 import { attemptInstalments, setLoanCap } from "../queries/loans.queries";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
@@ -19,7 +19,7 @@ const router = Router();
 const httpClient = new HttpClient();
 
 function onEachDay() {
-    attemptInstalments();
+  attemptInstalments();
 }
 
 router.post("/", async (req, res) => {
@@ -29,7 +29,7 @@ router.post("/", async (req, res) => {
         const balanceData = await firstValueFrom(getStartingBalance());
 
         if (epochStartTime === undefined || balanceData === undefined) {
-          res.status(400).json({ error: "Invalid payload: epoch_start_time required" });
+          res.status(400).json({ success: false, error: "invalidPayload", details: "epoch_start_time required" });
           return;
         }
 
@@ -39,22 +39,22 @@ router.post("/", async (req, res) => {
 
         setLoanInterestRate(Number(primeRate));
         setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);
-        const fromAccountNumber = await getAccountFromOrganizationUnit('thoh').then(account => account?.accountNumber);
+        const fromAccountNumber = await getAccountFromTeamId('thoh').then(account => account?.account_number);
         initSimulation(epochStartTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
-        const toAccountNumber = await getAccountFromOrganizationUnit('commercial-bank').then(account => account?.accountNumber);
+        const toAccountNumber = await getAccountFromTeamId('commercial-bank').then(account => account?.account_number);
         if (!toAccountNumber) {
-            res.status(404).json({ error: "Commercial bank account not found" });
+            res.status(404).json({ success: false, error: "commercialBankAccountNotFound" });
             return;
         }
         if (!fromAccountNumber) {
-            res.status(404).json({ error: "THOH account not found" });
+            res.status(404).json({ success: false, error: "thohAccountNotFound" });
             return;
         }
         await createTransaction(toAccountNumber, fromAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
-        res.status(200).send(`${appConfig.thohHost}/orders/payments`);
+        res.status(200).send({ success: true, route: `${appConfig.thohHost}/orders/payments` });
     } catch (error) {
         console.log("Error starting simulation:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ success: false, error: "Internal Server Error" });
     }
 });
 
@@ -76,9 +76,9 @@ router.delete("/", async (req, res) => {
     try {
         endSimulation();
         resetDB(getSimTime());
-        res.status(200).send();
+        res.status(200).json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ success: false, error: "Internal Server Error" });
     }
 });
 

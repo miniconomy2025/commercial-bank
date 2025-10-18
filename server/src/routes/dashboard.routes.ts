@@ -31,10 +31,10 @@ router.get('/accounts/metrics', async (req: Request, res: Response) => {
     const account = req.query.account as string;
     const expenses = await getAllAccountExpenses(parseInt(account));
     
-    res.status(200).json(expenses);
+    res.status(200).json({ success: true, expenses });
   } catch (error) {
     logger.error('Error fetching account metrics:', error);
-    res.status(500).json({ error: 'Internal Server Error' , detail:error });
+    res.status(500).json({ success: false, error: 'internalError' , detail: error });
   }
 });
 

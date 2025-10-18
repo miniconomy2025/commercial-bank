@@ -49,7 +49,7 @@ router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Po
 
     const newAccount = await createAccount(createdAt, notification_url, teamId ?? '');
 
-    if (newAccount.success && newAccount.account_number === 'accountAlreadyExists') {
+    if (!newAccount.success && newAccount.error === 'accountAlreadyExists') {
       logger.info(`Account already exists for team ID: ${teamId}`);
       res.status(409).json({ success: false, error: 'accountAlreadyExists' });
       return;
@@ -88,14 +88,14 @@ router.post('/interbank-transfer', async (req: Request<{}, {}, Post_InterbankTra
 
 router.get('/me/balance', accountMiddleware, async (req: Request, res: Response) => {
   try {
-    const accountNumber = req.account?.accountNumber;
-    if (!accountNumber) {
+    const accountNumber = req.account?.account_number;
+    if (accountNumber == null) {
       console.log(accountNumber)
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
     const balance = await getAccountBalance(accountNumber);
-    if (balance === null) {
+    if (balance == null) {
       console.log("Balance is null for account:", accountNumber);
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
@@ -109,7 +109,7 @@ router.get('/me/balance', accountMiddleware, async (req: Request, res: Response)
 
 router.get('/me/frozen', accountMiddleware, async (req: Request, res: Response) => {
   try {
-    const accountNumber = req.account?.accountNumber;
+    const accountNumber = req.account?.account_number;
     if (!accountNumber) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;

@@ -1,11 +1,11 @@
 import https from "https";
-import fs from "fs";
 import { URL } from "url";
 import { Observable, throwError } from "rxjs";
 import { catchError, timeout } from "rxjs/operators";
 import appConfig from "../config/app.config";
 import { snakeToCamelCaseMapper } from "./mapper";
-import { rootCertificates } from 'tls';
+// import fs from "fs";
+// import { rootCertificates } from 'tls';
 
 export interface HttpClientResponse<T = any> {
   statusCode?: number;

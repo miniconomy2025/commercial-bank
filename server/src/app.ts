@@ -14,7 +14,7 @@ app.use(express.json());
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ success: true, status: 'ok' });
 });
 app.use(authMiddleware);
 app.use('/api/account', accountsRouter);

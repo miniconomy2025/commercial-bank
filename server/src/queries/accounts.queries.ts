@@ -51,10 +51,11 @@ export const createAccount = async (
 
 export const getAccountInformation = async (teamId: string): Promise<AccountInfo | null> => {
   try {
-    const accountInformation = await db.oneOrNone<AccountInfo>(
+    const result = await db.oneOrNone(
       `SELECT 
         a.account_number,
-        COALESCE(incoming.total, 0) - COALESCE(outgoing.total, 0) AS net_balance
+        (COALESCE(incoming.total, 0) - COALESCE(outgoing.total, 0))::numeric AS net_balance,
+        COALESCE(a.notification_url, '') AS notification_url
       FROM accounts a
       LEFT JOIN account_refs ar ON a.account_number = ar.account_number
       LEFT JOIN (
@@ -70,7 +71,13 @@ export const getAccountInformation = async (teamId: string): Promise<AccountInfo
       WHERE a.team_id = $1;`,
       [teamId]
     );
-    return accountInformation;
+    
+    if (!result) return null;
+    
+    return {
+      ...result,
+      net_balance: parseFloat(result.net_balance),
+    };
   }
   catch (error: any) { return error.message }
 }
