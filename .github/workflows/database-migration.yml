@@ -24,6 +24,6 @@ jobs:
             redgate/flyway \
             -url="${{ secrets.DATABASE_MIGRATIONS_URL }}" \
             -cleanDisabled=false \
-            -target=5
+            -target=5 \
             clean \
-            migrate \
+            migrate
