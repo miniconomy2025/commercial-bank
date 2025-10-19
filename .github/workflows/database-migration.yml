@@ -23,7 +23,7 @@ jobs:
             --volume ${GITHUB_WORKSPACE}/flyway:/flyway/sql:ro \
             redgate/flyway \
             -url="${{ secrets.DATABASE_MIGRATIONS_URL }}" \
-            clean \
-            -cleanDisabled=true \
-            migrate \
+            -cleanDisabled=false \
             -target=5
+            clean \
+            migrate \
