@@ -23,10 +23,13 @@ function onEachDay() {
 }
 
 router.post("/", async (req, res) => {
+  console.log("========== START SIMULATION ==========")
     try {
         const { epochStartTime } = snakeToCamelCaseMapper(req.body);
+        console.log(" - START TIME:", epochStartTime);
 
         const balanceData = await firstValueFrom(getStartingBalance());
+        console.log(" - BALANCE DATA:", balanceData);
 
         if (epochStartTime === undefined || balanceData === undefined) {
           res.status(400).json({ success: false, error: "invalidPayload", details: "epoch_start_time required" });
@@ -34,8 +37,11 @@ router.post("/", async (req, res) => {
         }
 
         const { investmentValue, primeRate } = snakeToCamelCaseMapper(balanceData);
+        console.log(" - INVESTMENT VALUE:", investmentValue);
+        console.log(" - PRIME RATE:", primeRate);
 
-        resetDB(epochStartTime);
+        console.log("--------- RESETTING DB ----------")
+        await resetDB(epochStartTime);
 
         setLoanInterestRate(Number(primeRate));
         setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);
@@ -59,6 +65,8 @@ router.post("/", async (req, res) => {
 });
 
 const getStartingBalance = (): Observable<{ prime_rate: number; investment_value: number } | undefined> => {
+  if (!appConfig.isProd) return of({ prime_rate: 0.1, investment_value: 100000000 });
+
   return httpClient.get(`${appConfig.thohHost}/bank/initialization`).pipe(
     retry(3),
     map((res: HttpClientResponse) => {
