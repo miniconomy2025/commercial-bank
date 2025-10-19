@@ -1,6 +1,7 @@
 import db from "../config/db.config";
 import { createTransaction } from "./transactions.queries";
 import { sendNotification } from '../utils/notification';
+import { Post_InterbankTransfer_Res, SimpleResult } from "../types/endpoint.types";
 
 export const performInterbankTransfer = async (
     transaction_number: string,
@@ -8,7 +9,13 @@ export const performInterbankTransfer = async (
     to_account_number: string,
     amount: number,
     description: string,
-): Promise<InterbankTransferResult> => {
+    from_bank_name: string = 'retail-bank'
+): Promise<Post_InterbankTransfer_Res> => {
+    // Validate this is only for external banks sending TO commercial-bank
+    if (from_bank_name === 'commercial-bank') {
+        return { success: false, error: "invalidSenderBank" };
+    }
+
     // Validate amount
     if (amount <= 0) { return { success: false, error: "invalidAmount" }; }
 
@@ -27,8 +34,10 @@ export const performInterbankTransfer = async (
         [transaction_number]
     );
     if (duplicateTransaction) {
-        return { success: false, error: "existingTransactionNumber" };
+        return { success: false, error: "duplicateTransactionNumber" };
     }
+
+    // Note: No sender balance validation - external banks handle their own validation
 
     // Insert transaction using createTransaction
     const transaction = await createTransaction(
@@ -36,7 +45,7 @@ export const performInterbankTransfer = async (
         from_account_number,
         amount,
         description,
-        'retail-bank', // sender_bank_name
+        from_bank_name, // sender_bank_name
         'commercial-bank', // recipient_bank_name
         transaction_number
     );
@@ -52,12 +61,5 @@ export const performInterbankTransfer = async (
       to: to_account_number
     });
 
-    return { success: true, message: "Transfer recorded successfully" };
+    return { success: true };
 }
-
-export type InterbankTransferError = "unknownRecipientAccount" | "existingTransactionNumber" | "invalidAmount";
-
-export type InterbankTransferResult = (
-    { success: true, message: "Transfer recorded successfully" } |
-    { success: false, error: InterbankTransferError }
-)

@@ -30,7 +30,8 @@ export const getAllTransactions = async (
     parameters.push(1); // Assuming 1 = success
   }
 
-  return db.manyOrNone(query, parameters);
+  const results = await db.manyOrNone(query, parameters);
+  return results.map(row => ({ ...row, amount: parseFloat(row.amount) }));
 };
 
 

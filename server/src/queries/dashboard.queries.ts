@@ -21,18 +21,15 @@ export const getAllExistingTransactions = async (account: string | undefined): P
     JOIN accounts to_acc ON to_ref.account_number = to_acc.account_number
   `;
 
-  if (account) {
-    return await db.manyOrNone(`
-      ${baseQuery}
-      WHERE from_acc.team_id = $1 OR to_acc.team_id = $1
-    `, [account]);
-  } else {
-    return await db.manyOrNone(baseQuery);
-  }
+  const results = account 
+    ? await db.manyOrNone(`${baseQuery} WHERE from_acc.team_id = $1 OR to_acc.team_id = $1`, [account])
+    : await db.manyOrNone(baseQuery);
+  
+  return results.map(row => ({ ...row, amount: parseFloat(row.amount) }));
 };
 
 export const getAllExistingAccounts = async (): Promise<AccountInfo[]> => {
-  return await db.manyOrNone(`
+  const results = await db.manyOrNone(`
     SELECT 
       a.id,
       a.account_number as account_number,
@@ -65,10 +62,17 @@ export const getAllExistingAccounts = async (): Promise<AccountInfo[]> => {
     ) account_totals ON a.account_number = account_totals.account_number
     WHERE a.closed_at IS NULL AND a.team_id NOT LIKE 'commercial-bank' AND a.team_id NOT LIKE 'thoh' 
   `);
+  
+  return results.map(row => ({
+    ...row,
+    balance: parseFloat(row.balance),
+    income: parseFloat(row.income),
+    expenses: parseFloat(row.expenses)
+  }));
 };
 
 export const getAllAccountExpenses = async (accountId: number): Promise<Expense[]> => {
-  return await db.manyOrNone(`
+  const results = await db.manyOrNone(`
     SELECT 
       t.description,
       t.amount
@@ -77,6 +81,8 @@ export const getAllAccountExpenses = async (accountId: number): Promise<Expense[
     JOIN accounts a ON ar.account_number = a.account_number
     WHERE a.id = $1
   `, [accountId]);
+  
+  return results.map(row => ({ ...row, amount: parseFloat(row.amount) }));
 };
 
 interface LoanBalance {
@@ -101,7 +107,7 @@ export const getLoanBalances = async (accountId: number): Promise<LoanBalance> =
     ) payments ON l.id = payments.loan_id
     WHERE a.id = $1 AND l.write_off = false
   `, [accountId]);
-  return result ?? { total_outstanding_balance: 0 };
+  return result ? { loan_balance: parseFloat(result.loan_balance) } : { loan_balance: 0 };
 };
 
 export type loan = {

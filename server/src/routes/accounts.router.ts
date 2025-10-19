@@ -5,7 +5,7 @@ import {
   updateAccountNotificationUrl,
   getAccountBalance,
 } from '../queries/accounts.queries';
-import { interbankTransfer } from '../queries/banks.queries';
+
 import { logger } from '../utils/logger';
 import { getSimTime } from '../utils/time';
 import {
@@ -15,8 +15,6 @@ import {
   Post_AccountMeNotify_Req,
   Post_AccountMeNotify_Res,
   Get_AccountMe_Req,
-  Post_InterbankTransfer_Req,
-  Post_InterbankTransfer_Res,
 } from '../types/endpoint.types';
 import db from '../config/db.config';
 import { accountMiddleware } from '../middlewares/auth.middleware';
@@ -68,23 +66,7 @@ router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Po
   }
 });
 
-router.post('/interbank-transfer', async (req: Request<{}, {}, Post_InterbankTransfer_Req>, res: Response<Post_InterbankTransfer_Res>) => {
-  try {
-    const { transaction_number, from_bank_name, from_account_number, to_account_number, amount, description } = req.body;
 
-    if ([transaction_number, from_bank_name, from_account_number, to_account_number, amount, description].some(field => field == null)) {
-      res.status(400).json({ success: false, error: 'invalidPayload' }); return;
-    }
-
-    const transferResult = await interbankTransfer(transaction_number, from_bank_name, from_account_number, to_account_number, amount, description);
-
-    if (transferResult.success) { res.status(200).json({ success: true }); }
-    else                        { res.status(400).json({ success: false, error: "internalError" }); }
-  } catch (error) {
-    logger.error('Error processing interbank transfer:', error);
-    res.status(500).json({ success: false, error: 'internalError' });
-  }
-} );
 
 router.get('/me/balance', accountMiddleware, async (req: Request, res: Response) => {
   try {

@@ -3,18 +3,19 @@
 
 import { SimTime } from "../utils/time";
 
+export type Unit = { [K in never]: never };
+
 // Handles success & specific data for individual failure cases
 export type Result<
-    S extends object,                                               // Success payload type
-    E extends { [key: string]: object } = {},                       // Error payload type, for each error string
-    Es extends string = keyof E extends string ? keyof E : never    // Possible error strings
-> = (
-    ({ success: true } & S) |
-    ({ [K in keyof E]: { success: false; error: K } & E[K] }[Es])
-);
+  S extends object,                                             // Success payload type
+  E extends { [key: string]: object } = Unit,                   // Error payload type, for each error string
+  Es extends string = keyof E extends string ? keyof E : never, // Possible error strings
+> =
+  | ({ success: true } & S)
+  | ({ [K in keyof E]: { success: false; error: K } & E[K] }[Es]);
 
 // Simple result, no error payload
-export type SimpleResult<S extends object, Es extends string> = Result<S, { [K in Es]: {} }>;
+export type SimpleResult<S extends object, Es extends string> = Result<S, { [K in Es]: Unit }>;
 
 //-------------------- Generic Base Types --------------------//
 export type BankId = "commercial-bank" | "retail-bank" | "thoh";
@@ -146,7 +147,7 @@ export type RepaymentResult = { paid: number; };
 export type Post_Loan_Req = { amount: number; };
 export type Post_Loan_Res = Result<
     { loan_number: string },
-    { "invalidLoanAmount": {}, "loanNotPermitted": {}, "loanTooLarge": { amount_remaining: number }, "accountNotFound": {}, "internalError": {} }
+    { "invalidLoanAmount": {}, "loanNotPermitted": {}, "loanTooLarge": { amount_remaining: number }, "accountNotFound": {}, "internalError": {}, "bankDepleted": {} }
 >;
 
 // GET /loan
@@ -183,5 +184,5 @@ export type Post_InterbankTransfer_Req = {
 };
 export type Post_InterbankTransfer_Res = SimpleResult<
     {},
-    "invalidPayload" | "unknownRecipientAccount" | "duplicateTransactionNumber" | "transferNotPermitted" | "internalError"
+    "invalidPayload" | "unknownRecipientAccount" | "duplicateTransactionNumber" | "invalidSenderBank" | "invalidAmount" | "transferNotPermitted" | "internalError"
 >;

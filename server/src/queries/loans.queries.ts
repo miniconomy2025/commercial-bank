@@ -7,7 +7,7 @@ import { sendNotification } from '../utils/notification';
 import { LoanDetails, LoanPayment, LoanResult, LoanSummary, RepaymentResult, Result, SimpleResult } from "../types/endpoint.types";
 
 
-export let maxLoanableAmount = 1000000; // Maximum amount that can be loaned out across all accounts
+export let maxLoanableAmount = 10000; // Maximum amount that can be loaned out to any particular account
 export let loanInterestRate = 0.01;     // Interest charged each day on the outstanding loan amount
 
 export const setLoanInterestRate = (rate: number) => {
@@ -24,8 +24,8 @@ export const getLoanIdFromNumber = async (loanNumber: string, t?: ITask<{}>): Pr
 
 
 // Get the total amount of money that is still outstanding across all loans for the account
-export const getTotalOutstandingLoansForAccount = async (accountNumber: string, t?: ITask<{}>): Promise<number> =>
-  (await (t ?? db).one(`
+export const getTotalOutstandingLoansForAccount = async (accountNumber: string, t?: ITask<{}>): Promise<number> => {
+  const result = await (t ?? db).one(`
     SELECT
       COALESCE(SUM(init_tx.amount), 0) - COALESCE(SUM(rep_tx.amount), 0) AS remaining
     FROM accounts a
@@ -35,12 +35,14 @@ export const getTotalOutstandingLoansForAccount = async (accountNumber: string, 
     LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
     LEFT JOIN transactions rep_tx ON lp.transaction_id = rep_tx.id
     WHERE a.account_number = $1
-  `, [accountNumber]))?.remaining ?? 0;
+  `, [accountNumber]);
+  return result?.remaining ? parseFloat(result.remaining) : 0;
+};
 
 
 // Get outstanding repayments for a specific loan number
-export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>): Promise<number> =>
-  (await (t ?? db).one(`
+export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>): Promise<number> => {
+  const result = await (t ?? db).one(`
     SELECT
       COALESCE(init_tx.amount, 0) - COALESCE(SUM(rep_tx.amount), 0) AS outstanding
     FROM loans l
@@ -49,14 +51,20 @@ export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>
     LEFT JOIN transactions rep_tx ON rep_tx.id = lp.transaction_id
     WHERE l.loan_number = $1
     GROUP BY init_tx.amount
-  `, [loanNumber]))?.outstanding ?? 0;
+  `, [loanNumber]);
+  return result?.outstanding ? parseFloat(result.outstanding) : 0;
+};
 
+type CreateLoanResult = Result<
+  LoanResult, 
+  { "invalidLoanAmount": {}, "loanTooLarge": { amount_remaining: number }, "bankDepleted": {}, "internalError": {} }
+>;
 export const createLoan = async (
   accountNumber: string,
   amount: number,
   interestRate: number = loanInterestRate
-): Promise<Result<LoanResult, { "invalidLoanAmount": {}, "loanTooLarge": { amount_remaining: number }, "internalError": {} }>> => {
-  return db.tx(async t => {
+): Promise<CreateLoanResult> => {
+  return db.tx<CreateLoanResult>(async t => {
     // Check amount valid
     if (amount <= 0) return { success: false, error: "invalidLoanAmount" };
 
@@ -65,13 +73,19 @@ export const createLoan = async (
 
     // Get commercial-bank account no.
     const bankAccNo = await getCommercialBankAccountNumber(t);
-    if (bankAccNo == null) return { success: false, error: "internalError" }
+    if (bankAccNo == null) return { success: false, error: "internalError" };
+
+    // Check commercial-bank has sufficient funds
+    const bankBalance = await getAccountBalance(bankAccNo, t);
+    if (bankBalance == null || bankBalance < amount) {
+      return { success: false, error: "bankDepleted" };
+    }
 
     // Insert transaction
     const transaction = await createTransaction(accountNumber, bankAccNo, amount, `Loan disbursement to ${accountNumber}`);
 
     // Insert loan
-    const loan = await t.one<LoanResult>(`
+    const loanRaw = await t.one(`
       INSERT INTO loans (
         loan_number, initial_transaction_id, interest_rate, started_at, write_off
       ) VALUES (
@@ -79,6 +93,11 @@ export const createLoan = async (
       ) RETURNING loan_number, initial_transaction_id, interest_rate, started_at, write_off
       `, [ transaction.transaction_id, interestRate, getSimTime() ]
     );
+    
+    const loan: LoanResult = {
+      ...loanRaw,
+      interest_rate: parseFloat(loanRaw.interest_rate)
+    };
 
     // Send notification to recipient
     await sendNotification(accountNumber, {
@@ -97,7 +116,7 @@ export const createLoan = async (
 
 
 export const getLoanPaymentsByNumber = async (loanNumber: string): Promise<LoanPayment[]> => {
-  return db.manyOrNone(`
+  const results = await db.manyOrNone(`
     SELECT
       t.created_at AS timestamp,
       t.amount,
@@ -107,13 +126,15 @@ export const getLoanPaymentsByNumber = async (loanNumber: string): Promise<LoanP
     JOIN loans l ON lp.loan_id = l.id
     WHERE l.loan_number = $1
   `, [loanNumber]);
+  
+  return results.map(row => ({ ...row, amount: parseFloat(row.amount) }));
 }
 
 
 export const getLoanSummariesForAccount = async (
   accountNumber: string
 ): Promise<LoanSummary[]> => {
-  return db.manyOrNone<LoanSummary>(`
+  const results = await db.manyOrNone(`
     SELECT
       l.loan_number,
       t.amount AS initial_amount,
@@ -124,12 +145,19 @@ export const getLoanSummariesForAccount = async (
     FROM loans l
     JOIN transactions t ON t.id = l.initial_transaction_id
     JOIN account_refs ar ON t."to" = ar.id
-    LEFT JOIN loan_payments lp ON lp.loan_id = l.id
+    LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
     LEFT JOIN transactions p_tx ON p_tx.id = lp.transaction_id
     WHERE ar.account_number = $1
     GROUP BY l.loan_number, t.amount, l.interest_rate, l.started_at, l.write_off
     ORDER BY l.started_at DESC
   `, [accountNumber]);
+  
+  return results.map(row => ({
+    ...row,
+    initial_amount: parseFloat(row.initial_amount),
+    interest_rate: parseFloat(row.interest_rate),
+    outstanding_amount: parseFloat(row.outstanding_amount)
+  }));
 };
 
 // NOTE: Only the account which took out the loan can get loan summary
@@ -137,7 +165,7 @@ export const getLoanSummary = async (
   loanNumber: string,
   accountNumber: string
 ): Promise<LoanSummary | null> => {
-  return db.oneOrNone<LoanSummary>(`
+  const result = await db.oneOrNone(`
     SELECT
       l.loan_number,
       t.amount AS initial_amount,
@@ -148,12 +176,19 @@ export const getLoanSummary = async (
     FROM loans l
     JOIN transactions t ON t.id = l.initial_transaction_id
     JOIN account_refs ar ON t."to" = ar.id
-    LEFT JOIN loan_payments lp ON lp.loan_id = l.id
+    LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
     LEFT JOIN transactions p_tx ON p_tx.id = lp.transaction_id
     WHERE ar.account_number = $2
       AND l.loan_number = $1
     GROUP BY l.loan_number, t.amount, l.interest_rate, l.started_at, l.write_off
   `, [loanNumber, accountNumber]);
+  
+  return result ? {
+    ...result,
+    initial_amount: parseFloat(result.initial_amount),
+    interest_rate: parseFloat(result.interest_rate),
+    outstanding_amount: parseFloat(result.outstanding_amount)
+  } : null;
 };
 
 
@@ -173,12 +208,13 @@ export const getLoanDetails = async (
 
 
 // NOTE: Any account can contribute to the repayment of a loan on any other account
+type RepayLoanResult = SimpleResult<RepaymentResult, "invalidRepaymentAmount" | "loanNotFound" | "internalError">;
 export const repayLoan = async (
   loanNumber: string,
   accountNumber: string,
   amount: number
-): Promise<SimpleResult<RepaymentResult, "invalidRepaymentAmount" | "loanNotFound" | "internalError">> => {
-  return db.tx(async (t) => {
+): Promise<RepayLoanResult> => {
+  return db.tx<RepayLoanResult>(async (t) => {
 
     // Validate amount
     if (amount <= 0) return { success: false, error: "invalidRepaymentAmount" };
@@ -260,11 +296,11 @@ export const attemptInstalments = async (
       const threshold = balance * balancePercentageThreshold;
 
       // Get all outstanding loans for this account, with initial + remaining + interest_rate
-      const loans = await t.manyOrNone<{
+      const loansRaw = await t.manyOrNone<{
         loan_number: string;
-        initial_amount: number;
-        outstanding_amount: number;
-        interest_rate: number;
+        initial_amount: string;
+        outstanding_amount: string;
+        interest_rate: string;
       }>(`
         SELECT
           l.loan_number,
@@ -280,6 +316,13 @@ export const attemptInstalments = async (
         GROUP BY l.loan_number, init_tx.amount, l.interest_rate
         HAVING init_tx.amount - COALESCE(SUM(rep_tx.amount), 0) > 0
       `, [account_number]);
+      
+      const loans = loansRaw.map(loan => ({
+        loan_number: loan.loan_number,
+        initial_amount: parseFloat(loan.initial_amount),
+        outstanding_amount: parseFloat(loan.outstanding_amount),
+        interest_rate: parseFloat(loan.interest_rate)
+      }));
 
       if (loans.length === 0) continue; // No loans on this account
 

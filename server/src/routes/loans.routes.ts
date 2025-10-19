@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { createTransaction, getAllTransactions, getTransactionById } from '../queries/transactions.queries';
 import { createLoan, getLoanDetails, getLoanIdFromNumber, getLoanSummariesForAccount, getOutstandingLoanAmount, getTotalOutstandingLoansForAccount, maxLoanableAmount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
 import { logger } from '../utils/logger';
 import {
@@ -47,6 +46,7 @@ router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_
   }
   try {
     const loanResult = await createLoan(borrowerAccNo, amount);
+
     if (loanResult.success) {
       res.status(200).json({ success: true, loan_number: loanResult.loan_number });
     } else if (loanResult.error === "invalidLoanAmount") {
@@ -54,6 +54,8 @@ router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_
     } else if (loanResult.error === "loanTooLarge") {
       const { amount_remaining } = loanResult;
       res.status(422).json({ success: false, error: "loanTooLarge", amount_remaining: loanResult.amount_remaining });
+    } else if (loanResult.error === "bankDepleted") {
+      res.status(503).json({ success: false, error: "bankDepleted" });
     } else {
       res.status(500).json({ success: false, error: "internalError" });
     }
