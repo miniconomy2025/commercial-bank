@@ -84,6 +84,7 @@ jobs:
             TIMEOUT=6000
             CLIENT_ID=${{ secrets.CLIENT_ID }}
             API_DOMAIN=${{ vars.API_DOMAIN }}
+            THOH_HOST=https://ec2-13-244-65-62.af-south-1.compute.amazonaws.com
             EOF
 
             # Install app dependencies
