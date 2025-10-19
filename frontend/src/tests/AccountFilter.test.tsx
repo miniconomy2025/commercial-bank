@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
-import AccountFilter from '../AccountFilter';
-import type { Account } from '../../../types/Accounts';
+import AccountFilter from '../components/AccountFilter/AccountFilter';
+import type { Account } from '../types/Accounts';
 
 const mockAccounts: Account[] = [
   { id: '1', name: 'Checking', color: '#blue', account_number: '123', balance: '1000', income: '500', expenses: '200', loanBalance: '0' },

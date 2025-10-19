@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import TransactionItem from '../TransactionItem';
-import type { Transaction } from '../../../types/Transaction';
+import TransactionItem from '../components/TransactionItem/TransactionItem';
+import type { Transaction } from '../types/Transaction';
 
 const mockTransaction: Transaction = {
   transaction_number: '123',

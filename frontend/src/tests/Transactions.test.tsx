@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import Transactions from '../Transactions';
-import type { Transaction } from '../../../types/Transaction';
+import Transactions from '../components/Transactions/Transactions';
+import type { Transaction } from '../types/Transaction';
 
 const mockTransactions: Transaction[] = Array.from({ length: 12 }, (_, i) => ({
   transaction_number: `${i + 1}`,
