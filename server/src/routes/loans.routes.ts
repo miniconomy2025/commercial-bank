@@ -1,61 +1,33 @@
 import { Router, Request, Response } from 'express';
-import { createLoan, getLoanDetails, getLoanIdFromNumber, getLoanSummariesForAccount, getOutstandingLoanAmount, getTotalOutstandingLoansForAccount, maxLoanableAmount, repayLoan, setLoanInterestRate } from '../queries/loans.queries';
-import { logger } from '../utils/logger';
-import {
-  Post_Loan_Req,
-  Post_Loan_Res,
-  Get_Loan_Res,
-  Post_LoanNumberPay_Req,
-  Post_LoanNumberPay_Res,
-  Get_LoanNumber_Res,
-  Get_Loan_Req
-} from '../types/endpoint.types';
+import { createNewLoan, fetchLoansForAccount, repayLoanForNumber, fetchLoanDetails, updatePrimeRate } from '../services/loans.service';
 import db from '../config/db.config';
+import { logger } from '../utils/logger';
 
 //=============== /loan ==============//
 
 const router = Router()
 
-// Take out a loan
-router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_Loan_Res>) => {
-  const { amount } = req.body;
+router.post("/", async (req: Request, res: Response) => {
+  const { amount } = req.body as { amount: number };
   const borrowerAccNo = req.account!.account_number;
-
-  // Validation: amount >= 0
   if (!amount || isNaN(amount) || amount < 0) {
     res.status(400).json({ success: false, error: "invalidLoanAmount" });
     return;
   }
-  // Validation: account exists
-  const accountExists = await db.oneOrNone('SELECT 1 FROM accounts WHERE account_number = $1', [borrowerAccNo]);
-  if (!accountExists) {
-    res.status(404).json({ success: false, error: "accountNotFound" });
-    return;
-  }
-  // Validation: account not frozen
-  const frozenStatus = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [borrowerAccNo]);
-  if (frozenStatus?.frozen) {
-    res.status(422).json({ success: false, error: "loanNotPermitted" });
-    return;
-  }
-  // Validation: loan permitted by outstanding loans and bank funds
-  const outstandingLoans = await getTotalOutstandingLoansForAccount(borrowerAccNo);
-  if (outstandingLoans + amount > maxLoanableAmount) {
-    res.status(422).json({ success: false, error: "loanNotPermitted" });
-    return;
-  }
   try {
-    const loanResult = await createLoan(borrowerAccNo, amount);
-
+    const loanResult = await createNewLoan({ borrowerAccNo, amount });
     if (loanResult.success) {
-      res.status(200).json({ success: true, loan_number: loanResult.loan_number });
-    } else if (loanResult.error === "invalidLoanAmount") {
+      res.status(200).json({ success: true, loan_number: (loanResult as any).loan_number });
+    } else if ((loanResult as any).error === "invalidLoanAmount") {
       res.status(400).json({ success: false, error: "invalidLoanAmount" });
-    } else if (loanResult.error === "loanTooLarge") {
-      const { amount_remaining } = loanResult;
-      res.status(422).json({ success: false, error: "loanTooLarge", amount_remaining: loanResult.amount_remaining });
-    } else if (loanResult.error === "bankDepleted") {
+    } else if ((loanResult as any).error === "loanTooLarge") {
+      res.status(422).json({ success: false, error: "loanTooLarge", amount_remaining: (loanResult as any).amount_remaining });
+    } else if ((loanResult as any).error === "bankDepleted") {
       res.status(503).json({ success: false, error: "bankDepleted" });
+    } else if ((loanResult as any).error === 'accountNotFound') {
+      res.status(404).json({ success: false, error: 'accountNotFound' });
+    } else if ((loanResult as any).error === 'loanNotPermitted') {
+      res.status(422).json({ success: false, error: 'loanNotPermitted' });
     } else {
       res.status(500).json({ success: false, error: "internalError" });
     }
@@ -67,13 +39,10 @@ router.post("/", async (req: Request<{}, {}, Post_Loan_Req>, res: Response<Post_
 });
 
 
-// List all loans for the account
-// NOTE: Only the original borrower can get details for their loan
-router.get("/", async (req: Request<{}, {}, Get_Loan_Req>, res: Response<Get_Loan_Res>) => {
+router.get("/", async (req: Request, res: Response) => {
   const accNo = req.account!.account_number;
-
   try {
-    const loanSummaries = await getLoanSummariesForAccount(accNo);
+    const loanSummaries = await fetchLoansForAccount(accNo);
     res.status(200).json({ success: true, total_outstanding_amount: loanSummaries.reduce((sum, l) => sum + l.outstanding_amount, 0), loans: loanSummaries });
   }
   catch (error) {
@@ -83,61 +52,38 @@ router.get("/", async (req: Request<{}, {}, Get_Loan_Req>, res: Response<Get_Loa
 });
 
 
-// Repay loan
-// NOTE: Any account can contribute to the repayment of a loan on any other account
-router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }, {}, Post_LoanNumberPay_Req>, res: Response<Post_LoanNumberPay_Res>) => {
-  const { amount } = req.body;
+router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }>, res: Response) => {
+  const { amount } = req.body as { amount: number };
   if (!amount || isNaN(amount) || amount <= 0) {
     res.status(400).json({ success: false, error: "invalidPayload" });
     return;
   }
   const { loan_number } = req.params;
   const accNo = req.account!.account_number;
-  // Validation: loan exists
-  const loanId = await getLoanIdFromNumber(loan_number);
-  if (!loanId) {
-    res.status(404).json({ success: false, error: "loanNotFound" });
-    return;
-  }
-  // Validation: loan not written off and not paid off
-  const loanSummary = await db.oneOrNone('SELECT write_off FROM loans WHERE loan_number = $1', [loan_number]);
-  if (loanSummary?.write_off) {
-    res.status(410).json({ success: false, error: "loanWrittenOff" });
-    return;
-  }
-  const outstanding = await getOutstandingLoanAmount(loan_number);
-  if (outstanding <= 0) {
-    res.status(409).json({ success: false, error: "loanPaidOff" });
-    return;
-  }
-  // Validation: sufficient funds
-  const accountStatus = await db.oneOrNone('SELECT get_account_balance($1) AS balance', [accNo]);
-  if (!accountStatus || accountStatus.balance < amount) {
-    res.status(422).json({ success: false, error: "paymentNotPermitted" });
-    return;
- }
-  try {
-    const repayment = await repayLoan(loan_number, accNo, amount);
-    res.status(200).json(repayment);
-  }
-  catch (error) {
-    logger.error("Error repaying loan:", error);
-    res.status(500).json({ success: false, error: "internalError" });
+  const result = await repayLoanForNumber({ loan_number, accNo, amount });
+  switch (result.kind) {
+    case 'loanNotFound':
+      res.status(404).json({ success: false, error: "loanNotFound" }); return;
+    case 'loanWrittenOff':
+      res.status(410).json({ success: false, error: "loanWrittenOff" }); return;
+    case 'loanPaidOff':
+      res.status(409).json({ success: false, error: "loanPaidOff" }); return;
+    case 'paymentNotPermitted':
+      res.status(422).json({ success: false, error: "paymentNotPermitted" }); return;
+    case 'ok':
+      res.status(200).json(result.repayment); return;
   }
 });
 
 
-// Get specific loan details
-// NOTE: Only the account which took out the loan can get loan details
-router.get("/:loan_number", async (req: Request<{ loan_number: string }>, res: Response<Get_LoanNumber_Res>) => {
+router.get("/:loan_number", async (req: Request<{ loan_number: string }>, res: Response) => {
   const { loan_number } = req.params;
   const accNo = req.account!.account_number;
-
   try {
-    const loanDetails = await getLoanDetails(loan_number, accNo);
-    if (loanDetails.success)
+    const loanDetails = await fetchLoanDetails({ loan_number, accNo });
+    if ((loanDetails as any).success)
       { res.status(200).json({ success: true, loan: loanDetails }); }
-    else if (loanDetails.error === "loanNotFound")
+    else if ((loanDetails as any).error === "loanNotFound")
       { res.status(404).json({ success: false, error: "loanNotFound" }); }
     else { res.status(500).json({ success: false, error: "internalError" }); }
   }
@@ -147,16 +93,13 @@ router.get("/:loan_number", async (req: Request<{ loan_number: string }>, res: R
   }
 });
 
-// Update the prime rate
-// NOTE: only the hand can update this
-router.post("/prime_rate",async (req,res) =>{
+router.post("/prime_rate", async (req: Request, res: Response) =>{
   const teamId = req.teamId
-
   const {prime_rate} = req.body;
   if (teamId!=="thoh"){
     res.status(400).json({ success: false, error: "onlyThohCanChangePrimeRate" });
   } else {
-    setLoanInterestRate(Number(prime_rate));
+    updatePrimeRate(Number(prime_rate));
     res.status(200).json({ success: true, prime_rate });
   }
 });

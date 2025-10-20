@@ -2,23 +2,14 @@
 // TODO: Add types for request and response in endpoint.types.ts
 
 import { Router, Request, Response } from 'express';
+import { getAccountsWithLoanBalance, getExpensesForAccount, getLoansForAccount, getTransactionsForAccount } from '../services/dashboard.service';
 import { logger } from '../utils/logger';
-import { getAllAccountExpenses, getAllExistingAccounts, getAllExistingTransactions, getLoanBalances } from '../queries/dashboard.queries';
-import { getLoanSummariesForAccount } from '../queries/loans.queries';
-import { Get_AccountMe_Res, Get_Loan_Res, Get_Transaction_Res } from '../types/endpoint.types';
 
 const router = Router();
 
-router.get('/accounts', async (req, res) => {
+router.get('/accounts', async (req: Request, res: Response) => {
   try {
-    const accounts = (await getAllExistingAccounts());
-    const accountIds = accounts.map((account: any) => account.id);
-    
-    const loanBalances = await Promise.all(accountIds.map((id: number) => getLoanBalances(id)));
-    const accountsWithLoanBalance = accounts.map((account: any, idx: number) => {
-      const loanBalance = loanBalances[idx]?.loan_balance || 0;
-      return { ...account, loanBalance };
-    });
+    const accountsWithLoanBalance = await getAccountsWithLoanBalance();
     res.status(200).json({ success: true, accounts: accountsWithLoanBalance });
   } catch (error) {
     logger.error('Error fetching accounts:', error);
@@ -29,8 +20,7 @@ router.get('/accounts', async (req, res) => {
 router.get('/accounts/metrics', async (req: Request, res: Response) => {
   try {
     const account = req.query.account as string;
-    const expenses = await getAllAccountExpenses(parseInt(account));
-    
+    const expenses = await getExpensesForAccount(parseInt(account));
     res.status(200).json({ success: true, expenses });
   } catch (error) {
     logger.error('Error fetching account metrics:', error);
@@ -38,10 +28,10 @@ router.get('/accounts/metrics', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/loans', async (req, res) => {
+router.get('/loans', async (req: Request, res: Response) => {
   const accNo = req.query.accountNumber as string
    try {
-      const loanSummaries = await getLoanSummariesForAccount(accNo);
+      const loanSummaries = await getLoansForAccount(accNo);
       res.status(200).json({ success: true, total_outstanding_amount: loanSummaries.reduce((sum, l) => sum + l.outstanding_amount, 0), loans: loanSummaries });
     }
     catch (error) {
@@ -51,10 +41,10 @@ router.get('/loans', async (req, res) => {
 });
 
 
-router.get('/transactions', async (req, res) => {
+router.get('/transactions', async (req: Request, res: Response) => {
   try {
     const account = req.query.account as string;
-    const allTransactions = await getAllExistingTransactions(account);
+    const allTransactions = await getTransactionsForAccount(account);
     res.status(200).json({ success: true, transactions: allTransactions });
   } catch (error) {
     logger.error('Error fetching accounts:', error);

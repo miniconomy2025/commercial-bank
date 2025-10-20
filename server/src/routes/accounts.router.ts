@@ -1,33 +1,17 @@
-import { Router, Request, Response } from 'express';
-import {
-  createAccount,
-  getAccountInformation,
-  updateAccountNotificationUrl,
-  getAccountBalance,
-} from '../queries/accounts.queries';
-
+import { Router } from 'express';
+import { accountMiddleware } from '../middlewares/auth.middleware';
+import { fetchAccountInfo, createTeamAccount, fetchAccountBalance, fetchFrozenStatus, setAccountNotificationUrl } from '../services/accounts.service';
 import { logger } from '../utils/logger';
 import { getSimTime } from '../utils/time';
-import {
-  Post_Account_Req,
-  Post_Account_Res,
-  Get_AccountMe_Res,
-  Post_AccountMeNotify_Req,
-  Post_AccountMeNotify_Res,
-  Get_AccountMe_Req,
-} from '../types/endpoint.types';
-import db from '../config/db.config';
-import { accountMiddleware } from '../middlewares/auth.middleware';
 
 //=============== /account ==============//
 
 const router = Router();
 
-router.get('/me', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<Get_AccountMe_Res>) => {
+router.get('/me', async (req, res) => {
   try {
     const teamId = req.teamId;
-    const accInfo = await getAccountInformation(teamId!);
-
+    const accInfo = await fetchAccountInfo(teamId!);
     if (accInfo != null) {
       res.status(200).json({ success: true, ...accInfo });
     } else {
@@ -39,20 +23,17 @@ router.get('/me', async (req: Request<{}, {}, Get_AccountMe_Req>, res: Response<
   }
 });
 
-router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Post_Account_Res>) => {
+router.post('/', async (req, res) => {
   try {
     const createdAt = getSimTime();
     const notification_url = req.body?.notification_url ?? "";
-    const teamId = req.teamId;
-
-    const newAccount = await createAccount(createdAt, notification_url, teamId ?? '');
-
+    const teamId = req.teamId ?? '';
+    const newAccount = await createTeamAccount({ createdAt, notificationUrl: notification_url, teamId });
     if (!newAccount.success && newAccount.error === 'accountAlreadyExists') {
       logger.info(`Account already exists for team ID: ${teamId}`);
       res.status(409).json({ success: false, error: 'accountAlreadyExists' });
       return;
     }
-
     if (newAccount.success && isValidteamId(newAccount.account_number)) {
       res.status(201).json({ success: true, account_number: newAccount.account_number });
     } else if (!newAccount.success) {
@@ -68,17 +49,15 @@ router.post('/', async (req: Request<{}, {}, Post_Account_Req>, res: Response<Po
 
 
 
-router.get('/me/balance', accountMiddleware, async (req: Request, res: Response) => {
+router.get('/me/balance', accountMiddleware, async (req, res) => {
   try {
     const accountNumber = req.account?.account_number;
     if (accountNumber == null) {
-      console.log(accountNumber)
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
-    const balance = await getAccountBalance(accountNumber);
+    const balance = await fetchAccountBalance(accountNumber);
     if (balance == null) {
-      console.log("Balance is null for account:", accountNumber);
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
@@ -89,27 +68,25 @@ router.get('/me/balance', accountMiddleware, async (req: Request, res: Response)
   }
 });
 
-router.get('/me/frozen', accountMiddleware, async (req: Request, res: Response) => {
+router.get('/me/frozen', accountMiddleware, async (req, res) => {
   try {
     const accountNumber = req.account?.account_number;
     if (!accountNumber) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
-    // Use the DB helper function for frozen status
-    const result = await db.oneOrNone('SELECT is_account_frozen($1) AS frozen', [accountNumber]);
-    if (result === null) {
+    const frozen = await fetchFrozenStatus(accountNumber);
+    if (frozen == null) {
       res.status(404).json({ success: false, error: 'accountNotFound' });
       return;
     }
-    res.status(200).json({ success: true, frozen: result.frozen });
+    res.status(200).json({ success: true, frozen });
   } catch (error) {
     logger.error('Error checking frozen status:', error);
     res.status(500).json({ success: false, error: 'internalError' });
   }
 });
 
-// FIX: Add URL format validation for /account/me/notify
 function isValidUrl(urlString?: string): boolean {
   try {
     if (!urlString) return false;
@@ -120,12 +97,11 @@ function isValidUrl(urlString?: string): boolean {
   }
 }
 
-router.post('/account/me/notify', async (req: Request<{}, {}, Post_AccountMeNotify_Req>, res: Response<Post_AccountMeNotify_Res>) => {
+router.post('/account/me/notify', async (req, res) => {
   try {
     const { notification_url } = req.body;
     const teamId = req.teamId;
-
-    if (!notification_url || !isValidUrl(notification_url)) { // FIX: Validate URL format
+    if (!notification_url || !isValidUrl(notification_url)) {
       res.status(400).json({ success: false, error: 'invalidNotificationUrl' });
       return;
     }
@@ -133,7 +109,7 @@ router.post('/account/me/notify', async (req: Request<{}, {}, Post_AccountMeNoti
       res.status(403).json({ success: false, error: 'accountNotFound' });
       return;
     }
-    await updateAccountNotificationUrl(teamId, notification_url);
+    await setAccountNotificationUrl(teamId, notification_url);
     res.status(200).json({ success: true });
   } catch (error) {
     logger.error('Error updating notification URL:', error);

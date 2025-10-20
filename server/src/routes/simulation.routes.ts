@@ -1,105 +1,41 @@
 // TODO: Add this file to API spec
 // TODO: Add types for request and response in endpoint.types.ts
 
-import { Router } from "express";
-import { snakeToCamelCaseMapper } from "../utils/mapper";
-import { endSimulation, getDateTimeAsISOString, getSimTime, initSimulation } from "../utils/time";
-import { createTransaction } from "../queries/transactions.queries";
-import { getAccountFromTeamId } from "../queries/auth.queries";
+import { Request, Response, Router } from "express";
+import { listAccounts, startSimulation as startSimSvc, stopSimulation as stopSimSvc } from "../services/simulation.service";
 import { logger } from "../utils/logger";
-import { attemptInstalments, setLoanCap } from "../queries/loans.queries";
-import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
-import { setLoanInterestRate } from "../queries/loans.queries";
-import { HttpClient, HttpClientResponse } from "../utils/http-client";
-import { catchError, firstValueFrom, map, Observable, of, retry } from "rxjs";
-import { resetDB } from "../queries/simulation.queries";
-import appConfig from "../config/app.config";
 
 const router = Router();
-const httpClient = new HttpClient();
 
-function onEachDay() {
-  attemptInstalments();
-}
-
-router.post("/", async (req, res) => {
-  console.log("========== START SIMULATION ==========")
-    try {
-        const { epochStartTime } = snakeToCamelCaseMapper(req.body);
-        console.log(" - START TIME:", epochStartTime);
-
-        const balanceData = await firstValueFrom(getStartingBalance());
-        console.log(" - BALANCE DATA:", balanceData);
-
-        if (epochStartTime === undefined || balanceData === undefined) {
-          res.status(400).json({ success: false, error: "invalidPayload", details: "epoch_start_time required" });
-          return;
-        }
-
-        const { investmentValue, primeRate } = snakeToCamelCaseMapper(balanceData);
-        console.log(" - INVESTMENT VALUE:", investmentValue);
-        console.log(" - PRIME RATE:", primeRate);
-
-        console.log("--------- RESETTING DB ----------")
-        await resetDB(epochStartTime);
-
-        setLoanInterestRate(Number(primeRate));
-        setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);
-        const fromAccountNumber = await getAccountFromTeamId('thoh').then(account => account?.account_number);
-        initSimulation(epochStartTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
-        const toAccountNumber = await getAccountFromTeamId('commercial-bank').then(account => account?.account_number);
-        if (!toAccountNumber) {
-            res.status(404).json({ success: false, error: "commercialBankAccountNotFound" });
-            return;
-        }
-        if (!fromAccountNumber) {
-            res.status(404).json({ success: false, error: "thohAccountNotFound" });
-            return;
-        }
-        await createTransaction(toAccountNumber, fromAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
-        res.status(200).send({ success: true, route: `${appConfig.thohHost}/orders/payments` });
-    } catch (error) {
-        console.log("Error starting simulation:", error);
-        res.status(500).json({ success: false, error: "Internal Server Error" });
-    }
+router.post("/", async (req: Request, res: Response) => {
+  const { epochStartTime } = req.body as { epochStartTime: number };
+  const result = await startSimSvc({ epochStartTime });
+  if (!result) {
+    res.status(500).json({ success: false, error: 'internalError' });
+    return;
+  }
+  if (result.success) {
+    res.status(200).send(result);
+  } else if ((result as any).error === 'invalidPayload') {
+    res.status(400).json(result);
+  } else {
+    res.status(500).json(result);
+  }
 });
 
-const getStartingBalance = (): Observable<{ prime_rate: number; investment_value: number } | undefined> => {
-  if (!appConfig.isProd) return of({ prime_rate: 0.1, investment_value: 100000000 });
-
-  return httpClient.get(`${appConfig.thohHost}/bank/initialization`).pipe(
-    retry(3),
-    map((res: HttpClientResponse) => {
-      if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-        return res.data as { prime_rate: number; investment_value: number };
-      } else {
-        return { prime_rate: 0.1, investment_value: 10000000000 }; // Default values if the request fails
-      }
-    }),
-    catchError(() => of({ prime_rate: 0.1, investment_value: 10000000000 }))
-  );
-};
-
-router.delete("/", async (req, res) => {
-    try {
-        endSimulation();
-        resetDB(getSimTime());
-        res.status(200).json({ success: true });
-    } catch (error) {
-        res.status(500).json({ success: false, error: "Internal Server Error" });
-    }
+router.delete("/", async (_req: Request, res: Response) => {
+  const result = await stopSimSvc();
+  if (result.success) {
+    res.status(200).json(result);
+  } else {
+    res.status(500).json(result);
+  }
 });
 
-router.get('/accounts', async (req, res) => {
+router.get('/accounts', async (_req: Request, res: Response) => {
   try {
-    const accounts = (await getAllExistingAccounts());
-    const accountIds = accounts.map((account: any) => account.id);
-    const loanBalances = await Promise.all(accountIds.map((id: number) => getLoanBalances(id)));
-    const accountsWithLoanBalance = accounts.map((account: any, idx: number) => {
-      const loanBalance = loanBalances[idx]?.loan_balance || 0;
-      return { ...account, loanBalance };
-    });
-    res.status(200).json({ success: true, accounts: accountsWithLoanBalance });
+    const accounts = await listAccounts();
+    res.status(200).json({ success: true, accounts });
   } catch (error) {
     logger.error('Error fetching accounts:', error);
     res.status(500).json({ success: false, error: 'internalError' });
