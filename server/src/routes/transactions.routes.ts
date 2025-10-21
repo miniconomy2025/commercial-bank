@@ -123,22 +123,29 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
     switch(to_bank_name) {
       case 'thoh':
         // Interbank notification
-        httpClient.post(`${appConfig.thohHost}/orders/payments`, notificationPayload).subscribe({
-          next: (response) => { console.log("Notification sent successfully:", response); },
-          error: (error) =>   { console.log("Error sending notification:", error); }
-        });
-        // TODO: Correctly handle THOH response - If THOH returns an error, we should rollback the transaction
+        try {
+          httpClient.post(`${appConfig.thohHost}/orders/payments`, notificationPayload).subscribe({
+            next: (response) => { logger.info("THOH notification sent successfully:", response); },
+            error: (error) =>   { logger.error("Error sending THOH notification:", error.message || error); }
+          });
+        } catch (error) {
+          logger.error("Failed to send THOH notification:", error);
+        }
       break;
 
       case 'commercial-bank':
         // Send notification
-        const notificationUrl = await getAccountNotificationUrl(to_account_number);
+        try {
+          const notificationUrl = await getAccountNotificationUrl(to_account_number);
 
-        if (appConfig.isProd && notificationUrl != null && isValidUrl(notificationUrl)) {
-          httpClient.post(notificationUrl!, notificationPayload).subscribe({
-            next: (response) => { logger.info("Notification sent successfully:", response); },
-            error: (error) => { logger.info("Error sending notification:", error); }
-          });
+          if (appConfig.isProd && notificationUrl != null && isValidUrl(notificationUrl)) {
+            httpClient.post(notificationUrl!, notificationPayload).subscribe({
+              next: (response) => { logger.info("Commercial bank notification sent successfully:", response); },
+              error: (error) =>   { logger.error("Error sending commercial bank notification:", error.message || error); }
+            });
+          }
+        } catch (error) {
+          logger.error("Failed to send commercial bank notification:", error);
         }
       break;
 

@@ -26,7 +26,7 @@ const appConfig = {
   // keyPath: process.env.SERVER_KEY_PATH,
   // certPath: process.env.SERVER_CERT_PATH,
   timeout: process.env.TIMEOUT ? Number(process.env.TIMEOUT) : 60000,
-  thohHost: process.env.THOH_HOST ?? 'https://thoh-api.projects.bbdgrad.com',
+  thohHost: process.env.THOH_HOST ?? 'https://ec2-13-244-65-62.af-south-1.compute.amazonaws.com',
   clientId: process.env.CLIENT_ID,
   thohTeamId: 'thoh',
   thohAccountNumber: '000000000000',
