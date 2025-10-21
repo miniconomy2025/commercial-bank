@@ -50,19 +50,19 @@ BEGIN
             USING ERRCODE = 'foreign_key_violation';
     END IF;
 
-    -- Check if account_ref exists
-    SELECT id INTO v_account_ref_id
-    FROM account_refs
-    WHERE account_number = p_account_number
-      AND bank_id = v_bank_id;
+    -- Insert or get existing account_ref using ON CONFLICT
+    INSERT INTO account_refs (account_number, bank_id)
+    VALUES (p_account_number, v_bank_id)
+    ON CONFLICT (account_number, bank_id) DO NOTHING
+    RETURNING id INTO v_account_ref_id;
 
-    -- If no account_ref, create new
-    IF NOT FOUND THEN
-        INSERT INTO account_refs (account_number, bank_id)
-        VALUES (p_account_number, v_bank_id)
-        RETURNING id INTO v_account_ref_id;
+    -- If INSERT didn't return an ID (due to conflict), get the existing one
+    IF v_account_ref_id IS NULL THEN
+        SELECT id INTO v_account_ref_id
+        FROM account_refs
+        WHERE account_number = p_account_number
+          AND bank_id = v_bank_id;
     END IF;
-
 
     RETURN v_account_ref_id;
 END;
