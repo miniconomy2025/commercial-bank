@@ -127,11 +127,11 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
         // Interbank notification
         try {
           httpClient.post(`${appConfig.thohHost}/orders/payments`, notificationPayload).subscribe({
-            next: (response) => { logger.info("THOH notification sent successfully:", response); },
-            error: (error) =>   { logger.error("Error sending THOH notification:", error.message || error); }
+            next: (response) => { console.log("THOH notification sent successfully:", response); },
+            error: (error) =>   { console.log("Error sending THOH notification:", error.message || error); }
           });
         } catch (error) {
-          logger.error("Failed to send THOH notification:", error);
+          console.log("Failed to send THOH notification:", error);
         }
       break;
 
@@ -142,12 +142,12 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
 
           if (appConfig.isProd && notificationUrl != null && isValidUrl(notificationUrl)) {
             httpClient.post(notificationUrl!, notificationPayload).subscribe({
-              next: (response) => { logger.info("Commercial bank notification sent successfully:", response); },
-              error: (error) =>   { logger.error("Error sending commercial bank notification:", error.message || error); }
+              next: (response) => { console.log("Commercial bank notification sent successfully:", response); },
+              error: (error) =>   { console.log("Error sending commercial bank notification:", error.message || error); }
             });
           }
         } catch (error) {
-          logger.error("Failed to send commercial bank notification:", error);
+          console.log("Failed to send commercial bank notification:", error);
         }
       break;
 
