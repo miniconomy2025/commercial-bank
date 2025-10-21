@@ -122,6 +122,8 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
       from_company_name: from_company_name,
     };
 
+    console.log("Notification payload:", notificationPayload);
+
     switch(to_bank_name) {
       case 'thoh':
         // Interbank notification
