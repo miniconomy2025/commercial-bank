@@ -2,6 +2,7 @@ import { ITask } from "pg-promise";
 import db from "../config/db.config";
 import { getSimTime, SimTime } from "../utils/time";
 import { getAccountBalance, getCommercialBankAccountNumber, getCommercialBankAccountRefId } from "./accounts.queries";
+import { logger } from '../utils/logger';
 import { createTransaction } from "./transactions.queries";
 import { sendNotification } from '../utils/notification';
 import { LoanDetails, LoanPayment, LoanResult, LoanSummary, RepaymentResult, Result, SimpleResult } from "../types/endpoint.types";
@@ -296,25 +297,37 @@ export const chargeInterest = async () => {
       const interestCharge = outstandingAmount * interestRate;
 
       if (interestCharge > 0) {
-        // Create interest charge transaction
-        const transaction = await createTransaction(bankAccNo, loan.account_number, interestCharge, `Interest charge on loan ${loan.loan_number}`);
+        // Check if borrower has sufficient funds for interest payment
+        const borrowerBalance = await getAccountBalance(loan.account_number, t);
+        
+        if (borrowerBalance != null && borrowerBalance >= interestCharge) {
+          // Create interest charge transaction
+          const transaction = await createTransaction(bankAccNo, loan.account_number, interestCharge, `Interest charge on loan ${loan.loan_number}`);
 
-        // Link interest charge to the loan
-        await t.none(`
-          INSERT INTO loan_payments (loan_id, transaction_id, is_interest)
-          VALUES ($1, $2, true)
-        `, [loan.loan_id, transaction.transaction_id]);
+          // Link interest charge to the loan
+          await t.none(`
+            INSERT INTO loan_payments (loan_id, transaction_id, is_interest)
+            VALUES ($1, $2, true)
+          `, [loan.loan_id, transaction.transaction_id]);
 
-        // Send notification
-        await sendNotification(loan.account_number, {
-          transaction_number: transaction.transaction_number,
-          status: transaction.status || 'success',
-          amount: interestCharge,
-          timestamp: Number(getSimTime()),
-          description: `Interest charge on loan ${loan.loan_number}`,
-          from: bankAccNo,
-          to: loan.account_number
-        });
+          // Send notification
+          await sendNotification(loan.account_number, {
+            transaction_number: transaction.transaction_number,
+            status: transaction.status || 'success',
+            amount: interestCharge,
+            timestamp: Number(getSimTime()),
+            description: `Interest charge on loan ${loan.loan_number}`,
+            from: bankAccNo,
+            to: loan.account_number
+          });
+        } else {
+          // Insufficient funds - write off the loan
+          await t.none(`
+            UPDATE loans SET write_off = TRUE WHERE id = $1
+          `, [loan.loan_id]);
+          
+          logger.info(`Loan ${loan.loan_number} written off due to insufficient funds for interest payment`);
+        }
       }
     }
   });
