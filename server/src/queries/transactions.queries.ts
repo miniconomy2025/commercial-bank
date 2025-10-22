@@ -1,3 +1,4 @@
+import { ITask } from "pg-promise";
 import db from "../config/db.config";
 import { CreateTransactionResult, Post_Transaction_Res, Transaction } from "../types/endpoint.types";
 import { getSimTime } from "../utils/time";
@@ -54,9 +55,10 @@ export const createTransaction = async (
   description: string,
   sender_bank_name: string = 'commercial-bank',
   recipient_bank_name: string = 'commercial-bank',
-  transactionNumber?: string
+  transactionNumber?: string,
+  t?: ITask<{}>
 ): Promise<CreateTransactionResult> => {
-  return db.one(
+  return (t ?? db).one(
     `
     WITH inserted AS (
       INSERT INTO transactions (
