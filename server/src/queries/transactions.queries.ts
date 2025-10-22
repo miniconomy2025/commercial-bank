@@ -4,10 +4,10 @@ import { getSimTime } from "../utils/time";
 
 export const getAllTransactions = async (
   fromAccountNumber: string,
-  toAccountNumber: string,
+  toAccountNumber?: string,
   onlySuccessful: boolean = false
 ): Promise<Transaction[]> => {
-  const parameters: (string | number)[] = [fromAccountNumber, toAccountNumber];
+  const parameters: (string | number)[] = [fromAccountNumber];
   let query = `
     SELECT
       t.transaction_number,
@@ -22,13 +22,19 @@ export const getAllTransactions = async (
     JOIN account_refs to_ref ON t."to" = to_ref.id
     JOIN transaction_statuses s ON t.status_id = s.id
     WHERE (from_ref.account_number = $1 OR to_ref.account_number = $1)
-      AND (from_ref.account_number = $2 OR to_ref.account_number = $2)
   `;
 
+  if (toAccountNumber) {
+    query += ' AND (from_ref.account_number = $2 OR to_ref.account_number = $2)';
+    parameters.push(toAccountNumber);
+  }
+
   if (onlySuccessful) {
-    query += ' AND t.status_id = $3';
+    query += ` AND t.status_id = $${parameters.length + 1}`;
     parameters.push(1); // Assuming 1 = success
   }
+
+  query += ' ORDER BY t.created_at DESC';
 
   const results = await db.manyOrNone(query, parameters);
   return results.map(row => ({ ...row, amount: parseFloat(row.amount) }));

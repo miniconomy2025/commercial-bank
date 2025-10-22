@@ -235,7 +235,7 @@ export const repayLoan = async (
 
 
     // Create repayment transaction
-    const transaction = await createTransaction(accountNumber, bankAccNo, repayment, `Repayment of loan ${loanNumber}`);
+    const transaction = await createTransaction(bankAccNo, accountNumber, repayment, `Repayment of loan ${loanNumber}`);
 
     // Send notification to recipient
     await sendNotification(accountNumber, {
@@ -301,6 +301,7 @@ export const chargeInterest = async () => {
         const borrowerBalance = await getAccountBalance(loan.account_number, t);
         
         if (borrowerBalance != null && borrowerBalance >= interestCharge) {
+          try {
           // Create interest charge transaction
           const transaction = await createTransaction(bankAccNo, loan.account_number, interestCharge, `Interest charge on loan ${loan.loan_number}`);
 
@@ -317,9 +318,21 @@ export const chargeInterest = async () => {
             amount: interestCharge,
             timestamp: Number(getSimTime()),
             description: `Interest charge on loan ${loan.loan_number}`,
-            from: bankAccNo,
-            to: loan.account_number
+            from: loan.account_number,
+            to: bankAccNo
           });
+          } catch (error: any) {
+            // If transaction fails due to insufficient funds, write off the loan
+            if (error.code === 'check_violation' || error.message?.includes('Insufficient funds')) {
+              await t.none(`
+                UPDATE loans SET write_off = TRUE WHERE id = $1
+              `, [loan.loan_id]);
+              
+              logger.info(`Loan ${loan.loan_number} written off due to insufficient funds for interest payment: ${error.message}`);
+            } else {
+              throw error; // Re-throw other errors
+            }
+          }
         } else {
           // Insufficient funds - write off the loan
           await t.none(`
