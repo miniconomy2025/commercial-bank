@@ -27,13 +27,13 @@ export const getLoanIdFromNumber = async (loanNumber: string, t?: ITask<{}>): Pr
 export const getTotalOutstandingLoansForAccount = async (accountNumber: string, t?: ITask<{}>): Promise<number> => {
   const result = await (t ?? db).one(`
     SELECT
-      COALESCE(SUM(init_tx.amount), 0) - COALESCE(SUM(rep_tx.amount), 0) AS remaining
+      GREATEST(0, COALESCE(SUM(init_tx.amount), 0) - COALESCE(SUM(rep_tx.amount), 0)) AS remaining
     FROM accounts a
     JOIN account_refs ar ON ar.account_number = a.account_number AND ar.bank_id = 1
     JOIN transactions init_tx ON init_tx."to" = ar.id
     JOIN loans l ON l.initial_transaction_id = init_tx.id
-    LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
-    LEFT JOIN transactions rep_tx ON lp.transaction_id = rep_tx.id
+    LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
+    LEFT JOIN transactions rep_tx ON lp_rep.transaction_id = rep_tx.id
     WHERE a.account_number = $1
   `, [accountNumber]);
   return result?.remaining ? parseFloat(result.remaining) : 0;
@@ -42,13 +42,13 @@ export const getTotalOutstandingLoansForAccount = async (accountNumber: string, 
 
 // Get outstanding repayments for a specific loan number
 export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>): Promise<number> => {
-  const result = await (t ?? db).one(`
+  const result = await (t ?? db).oneOrNone(`
     SELECT
-      COALESCE(init_tx.amount, 0) - COALESCE(SUM(rep_tx.amount), 0) AS outstanding
+      GREATEST(0, COALESCE(init_tx.amount, 0) - COALESCE(SUM(rep_tx.amount), 0)) AS outstanding
     FROM loans l
     JOIN transactions init_tx ON init_tx.id = l.initial_transaction_id
-    LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
-    LEFT JOIN transactions rep_tx ON rep_tx.id = lp.transaction_id
+    LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
+    LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id
     WHERE l.loan_number = $1
     GROUP BY init_tx.amount
   `, [loanNumber]);
@@ -141,12 +141,12 @@ export const getLoanSummariesForAccount = async (
       l.interest_rate,
       l.started_at,
       l.write_off,
-      COALESCE(t.amount - SUM(p_tx.amount), t.amount) AS outstanding_amount
+      GREATEST(0, COALESCE(t.amount - SUM(rep_tx.amount), t.amount)) AS outstanding_amount
     FROM loans l
     JOIN transactions t ON t.id = l.initial_transaction_id
     JOIN account_refs ar ON t."to" = ar.id
-    LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
-    LEFT JOIN transactions p_tx ON p_tx.id = lp.transaction_id
+    LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
+    LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id
     WHERE ar.account_number = $1
     GROUP BY l.loan_number, t.amount, l.interest_rate, l.started_at, l.write_off
     ORDER BY l.started_at DESC
@@ -172,12 +172,12 @@ export const getLoanSummary = async (
       l.interest_rate,
       l.started_at,
       l.write_off,
-      COALESCE(t.amount - SUM(p_tx.amount), t.amount) AS outstanding_amount
+      GREATEST(0, COALESCE(t.amount - SUM(rep_tx.amount), t.amount)) AS outstanding_amount
     FROM loans l
     JOIN transactions t ON t.id = l.initial_transaction_id
     JOIN account_refs ar ON t."to" = ar.id
-    LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
-    LEFT JOIN transactions p_tx ON p_tx.id = lp.transaction_id
+    LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
+    LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id
     WHERE ar.account_number = $2
       AND l.loan_number = $1
     GROUP BY l.loan_number, t.amount, l.interest_rate, l.started_at, l.write_off
@@ -234,7 +234,7 @@ export const repayLoan = async (
 
 
     // Create repayment transaction
-    const transaction = await createTransaction(bankAccNo, accountNumber, repayment, `Repayment of loan ${loanNumber}`);
+    const transaction = await createTransaction(accountNumber, bankAccNo, repayment, `Repayment of loan ${loanNumber}`);
 
     // Send notification to recipient
     await sendNotification(accountNumber, {
@@ -243,8 +243,8 @@ export const repayLoan = async (
       amount: repayment,
       timestamp: Number(getSimTime()),
       description: `Repayment of loan ${loanNumber}`,
-      from: bankAccNo,
-      to: accountNumber
+      from: accountNumber,
+      to: bankAccNo
     });
 
     // Link repayment to the loan
@@ -259,13 +259,71 @@ export const repayLoan = async (
   });
 };
 
-// 'Smart' debit order system for repayments on loans:
-// - A list of all outstanding loans, their outstanding amounts, and their initial amounts is aggregated
-// - (The total outstanding amount should be calculated from this list, and multiplied by `instalmentPercentage`) = instalTotal
-// - If (balance * balancePercentageThreshold = threshold) <= instalTotal: insufficient funds => fail to pay instalment this time 'round
-// - Otherwise: Loop through all outstanding loans, paying off the ones with the largest interest rate & largest outstanding amount first
+// Charge interest on all outstanding loans
+export const chargeInterest = async () => {
+  await db.tx(async t => {
+    // Get all loans with outstanding balances
+    const loansWithBalance = await t.manyOrNone<{
+      loan_id: number;
+      loan_number: string;
+      account_number: string;
+      outstanding_amount: string;
+      interest_rate: string;
+    }>(`
+      SELECT
+        l.id as loan_id,
+        l.loan_number,
+        ar.account_number,
+        init_tx.amount - COALESCE(SUM(rep_tx.amount), 0) AS outstanding_amount,
+        l.interest_rate
+      FROM loans l
+      JOIN transactions init_tx ON init_tx.id = l.initial_transaction_id
+      JOIN account_refs ar ON init_tx."to" = ar.id
+      LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
+      LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id
+      WHERE l.write_off = FALSE
+      GROUP BY l.id, l.loan_number, ar.account_number, init_tx.amount, l.interest_rate
+      HAVING init_tx.amount - COALESCE(SUM(rep_tx.amount), 0) > 0
+    `);
 
-// Loop through all active loans across all accounts, and attempt the payment of an instalment for each of them
+    const bankAccNo = await getCommercialBankAccountNumber(t);
+    if (!bankAccNo) return;
+
+    // Charge interest on each loan
+    for (const loan of loansWithBalance) {
+      const outstandingAmount = parseFloat(loan.outstanding_amount);
+      const interestRate = parseFloat(loan.interest_rate);
+      const interestCharge = outstandingAmount * interestRate;
+
+      if (interestCharge > 0) {
+        // Create interest charge transaction
+        const transaction = await createTransaction(bankAccNo, loan.account_number, interestCharge, `Interest charge on loan ${loan.loan_number}`);
+
+        // Link interest charge to the loan
+        await t.none(`
+          INSERT INTO loan_payments (loan_id, transaction_id, is_interest)
+          VALUES ($1, $2, true)
+        `, [loan.loan_id, transaction.transaction_id]);
+
+        // Send notification
+        await sendNotification(loan.account_number, {
+          transaction_number: transaction.transaction_number,
+          status: transaction.status || 'success',
+          amount: interestCharge,
+          timestamp: Number(getSimTime()),
+          description: `Interest charge on loan ${loan.loan_number}`,
+          from: bankAccNo,
+          to: loan.account_number
+        });
+      }
+    }
+  });
+};
+
+// 'Smart' debit order system for repayments on loans:
+// - Calculate instalment as percentage of initial loan amounts (not outstanding)
+// - Only proceed if instalment amount is within account balance threshold
+// - Pay loans in order of highest interest rate first
 export const attemptInstalments = async (
   instalmentPercentage: number = 0.10,          // Instalment amount is calculated as 10% of the initial investment
   balancePercentageThreshold: number = 0.05,    // Instalment will only be paid if it's < 5% of account balance
@@ -305,16 +363,16 @@ export const attemptInstalments = async (
         SELECT
           l.loan_number,
           init_tx.amount AS initial_amount,
-          init_tx.amount - COALESCE(SUM(rep_tx.amount), 0) AS outstanding_amount,
+          GREATEST(0, init_tx.amount - COALESCE(SUM(rep_tx.amount), 0)) AS outstanding_amount,
           l.interest_rate
         FROM loans l
         JOIN transactions init_tx ON init_tx.id = l.initial_transaction_id
         JOIN account_refs ar ON init_tx."to" = ar.id
-        LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
-        LEFT JOIN transactions rep_tx ON rep_tx.id = lp.transaction_id
+        LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
+        LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id
         WHERE ar.account_number = $1
         GROUP BY l.loan_number, init_tx.amount, l.interest_rate
-        HAVING init_tx.amount - COALESCE(SUM(rep_tx.amount), 0) > 0
+        HAVING GREATEST(0, init_tx.amount - COALESCE(SUM(rep_tx.amount), 0)) > 0
       `, [account_number]);
       
       const loans = loansRaw.map(loan => ({
@@ -326,11 +384,11 @@ export const attemptInstalments = async (
 
       if (loans.length === 0) continue; // No loans on this account
 
-      // Calculate total outstanding amount for all loans and instalment total
-      const totalOutstanding = loans.reduce((sum, loan) => sum + loan.outstanding_amount, 0);
-      let instalTotal = totalOutstanding * instalmentPercentage;
+      // Calculate instalment total based on initial amounts (as per comment)
+      const totalInitialAmount = loans.reduce((sum, loan) => sum + loan.initial_amount, 0);
+      let instalTotal = totalInitialAmount * instalmentPercentage;
 
-      // If threshold is too low, skip this round
+      // If instalment amount exceeds threshold, skip this round
       if (instalTotal > threshold) continue;
 
       // Sort loans by highest interest rate, then highest outstanding amount
@@ -338,7 +396,7 @@ export const attemptInstalments = async (
         b.interest_rate - a.interest_rate || b.outstanding_amount - a.outstanding_amount
       );
 
-      // Pay off as much as possible of each loan, wittling down instalTotal
+      // Pay off as much as possible of each loan, whittling down instalTotal
       for (const loan of sortedLoans) {
         if (instalTotal <= 0) break;
         const payAmount = Math.min(loan.outstanding_amount, instalTotal);

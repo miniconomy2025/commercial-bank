@@ -7,7 +7,7 @@ import { endSimulation, getDateTimeAsISOString, getSimTime, initSimulation } fro
 import { createTransaction } from "../queries/transactions.queries";
 import { getAccountFromTeamId } from "../queries/auth.queries";
 import { logger } from "../utils/logger";
-import { attemptInstalments, setLoanCap } from "../queries/loans.queries";
+import { attemptInstalments, chargeInterest, setLoanCap } from "../queries/loans.queries";
 import { getAllExistingAccounts, getLoanBalances } from "../queries/dashboard.queries";
 import { setLoanInterestRate } from "../queries/loans.queries";
 import { HttpClient, HttpClientResponse } from "../utils/http-client";
@@ -18,8 +18,16 @@ import appConfig from "../config/app.config";
 const router = Router();
 const httpClient = new HttpClient();
 
-function onEachDay() {
-  attemptInstalments();
+async function onEachDay() {
+  try {
+    logger.info('Daily loan processing started');
+    await chargeInterest();
+    logger.info('Interest charging completed');
+    await attemptInstalments();
+    logger.info('Installment processing completed');
+  } catch (error) {
+    logger.error('Error in daily loan processing:', error);
+  }
 }
 
 router.post("/", async (req, res) => {
@@ -102,6 +110,42 @@ router.get('/accounts', async (req, res) => {
     res.status(200).json({ success: true, accounts: accountsWithLoanBalance });
   } catch (error) {
     logger.error('Error fetching accounts:', error);
+    res.status(500).json({ success: false, error: 'internalError' });
+  }
+});
+
+// Admin endpoint to manually trigger interest charging
+router.post('/charge-interest', async (req, res) => {
+  const teamId = req.teamId;
+  
+  if (teamId !== 'thoh') {
+    res.status(403).json({ success: false, error: 'onlyThohCanTriggerInterest' });
+    return;
+  }
+  
+  try {
+    await chargeInterest();
+    res.status(200).json({ success: true, message: 'Interest charged on all outstanding loans' });
+  } catch (error) {
+    logger.error('Error charging interest:', error);
+    res.status(500).json({ success: false, error: 'internalError' });
+  }
+});
+
+// Admin endpoint to manually trigger installment processing
+router.post('/process-installments', async (req, res) => {
+  const teamId = req.teamId;
+  
+  if (teamId !== 'thoh') {
+    res.status(403).json({ success: false, error: 'onlyThohCanTriggerInstallments' });
+    return;
+  }
+  
+  try {
+    await attemptInstalments();
+    res.status(200).json({ success: true, message: 'Installment processing completed' });
+  } catch (error) {
+    logger.error('Error processing installments:', error);
     res.status(500).json({ success: false, error: 'internalError' });
   }
 });

@@ -66,6 +66,12 @@ export async function accountMiddleware(req: Request, res: Response, next: NextF
 }
 
 export function simulationMiddleware(req: Request, res: Response, next: NextFunction) {
+  // Allow specific endpoints to handle their own auth with custom error messages
+  if (req.path === '/charge-interest' || req.path === '/process-installments') {
+    next();
+    return;
+  }
+  
   if (req.teamId !== appConfig.thohTeamId) {
     res.status(403).json({ success: false, error: "forbiddenThohOnly" });
     return;

@@ -110,12 +110,14 @@ router.post("/:loan_number/pay", async (req: Request<{ loan_number: string }, {}
     res.status(409).json({ success: false, error: "loanPaidOff" });
     return;
   }
-  // Validation: sufficient funds
+  // Validation: sufficient funds (check against actual repayment amount, not requested amount)
   const accountStatus = await db.oneOrNone('SELECT get_account_balance($1) AS balance', [accNo]);
-  if (!accountStatus || accountStatus.balance < amount) {
+  const actualRepayment = Math.max(0, Math.min(amount, outstanding)); // Same logic as in repayLoan
+  if (!accountStatus || accountStatus.balance < actualRepayment) {
     res.status(422).json({ success: false, error: "paymentNotPermitted" });
+    console.log("INSUFFICIENT FUNDS:", accountStatus.balance, actualRepayment);
     return;
- }
+  }
   try {
     const repayment = await repayLoan(loan_number, accNo, amount);
     res.status(200).json(repayment);
@@ -135,8 +137,10 @@ router.get("/:loan_number", async (req: Request<{ loan_number: string }>, res: R
 
   try {
     const loanDetails = await getLoanDetails(loan_number, accNo);
-    if (loanDetails.success)
-      { res.status(200).json({ success: true, loan: loanDetails }); }
+    if (loanDetails.success) {
+      const { success, ...loanData } = loanDetails;
+      res.status(200).json({ success: true, loan: loanData });
+    }
     else if (loanDetails.error === "loanNotFound")
       { res.status(404).json({ success: false, error: "loanNotFound" }); }
     else { res.status(500).json({ success: false, error: "internalError" }); }

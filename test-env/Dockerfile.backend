@@ -1,7 +1,12 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl wget
 RUN npm install -g pnpm
+
+# Install Flyway
+RUN wget -qO- https://download.red-gate.com/maven/release/com/redgate/flyway/flyway-commandline/11.14.1/flyway-commandline-11.14.1-linux-x64.tar.gz | tar xvz \
+    && mv flyway-11.14.1 /opt/flyway \
+    && ln -s /opt/flyway/flyway /usr/local/bin/flyway
 
 WORKDIR /app
 

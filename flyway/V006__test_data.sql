@@ -21,11 +21,14 @@ INSERT INTO accounts (account_number, team_id, notification_url, created_at, clo
 ('200000000018', 'team-018',        'https://test18.example.com/notify', 1700000017.00, NULL),
 ('200000000019', 'team-019',        'https://test19.example.com/notify', 1700000018.00, NULL),
 ('200000000020', 'team-020',        'https://test20.example.com/notify', 1700000019.00, 1700000100.00), -- closed
-('200000000021', 'team-021',        'https://test50.example.com/notify', 1700000020.00, NULL),          -- no loans
-('200000000022', 'team-022',        'https://test51.example.com/notify', 1700000021.00, NULL),          -- no loans
+('200000000021', 'team-021',        'https://test21.example.com/notify', 1700000020.00, NULL),          -- no loans
+('200000000022', 'team-022',        'https://test22.example.com/notify', 1700000021.00, NULL),          -- no loans
 ('200000002000', 'commercial-bank', '',                                  1700000000.00, NULL),          -- commercial-bank
 ('300000000001', 'thoh-001',        'https://thoh.example.com/notify',   1700000000.00, NULL),          -- thoh
-('200000000023', 'team-023',        'https://test51.example.com/notify', 1700000022.00, NULL);          -- no loans
+('200000000023', 'team-023',        'https://test23.example.com/notify', 1700000022.00, NULL),          -- no loans
+('200000000024', 'team-024',        'https://test24.example.com/notify', 1700000023.00, NULL),          -- no loans
+('200000000025', 'team-025',        'https://test25.example.com/notify', 1700000024.00, NULL),          -- no loans
+('200000000026', 'team-026',        'https://test26.example.com/notify', 1700000025.00, NULL);          -- no loans
 
 INSERT INTO account_refs (account_number, bank_id) VALUES
 ('200000000001', 1),
