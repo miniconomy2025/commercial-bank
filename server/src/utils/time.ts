@@ -5,8 +5,8 @@ import appConfig from "../config/app.config";
 export type SimTime = number;
 const httpClient = new HttpClient();
 
-const REAL_MS_PER_SIM_DAY = 2 * 60 * 1000;
-const SIM_MS_PER_DAY = 24 * 60 * 60 * 1000;
+export const REAL_MS_PER_SIM_DAY = 2 * 60 * 1000;
+export const SIM_MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 let simulationStartTime: number = Date.UTC(1970, 0, 1);
 let realStartTime : number = Date.now();
