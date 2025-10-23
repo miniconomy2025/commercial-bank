@@ -387,7 +387,7 @@ export const chargeInterest = async () => {
 // NOTE: instalmentPercentage should be < balancePercentageThreshold to enable a forgiving repayment plan
 export const attemptInstalments = async (
   instalmentPercentage: number = 0.10,          // Instalment amount is calculated as 10% of the initial investment
-  balancePercentageThreshold: number = 0.075,    // Instalment will only be paid if it's < 7.5% of account balance
+  balancePercentageThreshold: number = 0.085,   // Instalment will only be paid if it's < 8.5% of account balance
   ignoreAccounts: Set<string> = new Set()       // Accounts to ignore when paying loans
 ) => {
   logger.info(`Starting instalment collection process with ${instalmentPercentage * 100}% instalment rate and ${balancePercentageThreshold * 100}% balance threshold`);
