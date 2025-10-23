@@ -228,10 +228,20 @@ const AggregationContent = () => {
     );
   };
 
-  const { data: loanChartData, yKeys: loanChartYKeys } = processBalanceData(
+  const { data: balanceChartData, yKeys: balanceChartYKeys } = processBalanceData(
     accounts,
     selectedAccounts,
     transactions
+  );
+  
+  // For loan repayments, we need actual loan payment transactions
+  const loanTransactions = transactions.filter(t => 
+    t.description && t.description.includes('Repayment of loan')
+  );
+  const { data: loanChartData, yKeys: loanChartYKeys } = processBalanceData(
+    accounts,
+    selectedAccounts,
+    loanTransactions
   );
 
   if (error) {
@@ -254,6 +264,12 @@ const AggregationContent = () => {
             accounts={accounts}
           />
           <div className="chart-section">
+            <Chart
+                title="Account balances over time"
+                data={balanceChartData}
+                xKey="epoch"
+                yKeys={balanceChartYKeys}
+              />
             <Chart
                 title="Loan Repayments over time"
                 data={loanChartData}
