@@ -53,7 +53,7 @@ router.post("/", async (req, res) => {
         console.log(" - INVESTMENT VALUE:", investmentValue);
         console.log(" - PRIME RATE:", primeRate);
 
-        setLoanInterestRate(Number(primeRate) / 100.0);
+        setLoanInterestRate(Number(primeRate) / 300.0);
         setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) / 10);
 
         console.log("--------- RESETTING DB ----------")
