@@ -101,7 +101,7 @@ INSERT INTO transactions (transaction_number, "from", "to", amount, description,
 ('TXN000000039', 19, 9,  145.75,   'Transfer 39',    1, 1700001038.00),
 ('TXN000000040', 20, 10, 285.00,   'Transfer 40',    1, 1700001039.00),
 ('TXN000000041', 2,  1,  600.00,   'Large transfer', 1, 1700001040.00),
-('TXN000000042', 24, 23, 10000.00, 'Capital',        1, 1700001041.00);
+('TXN000000042', 24, 23, 10000000.00, 'Capital',        1, 1700001041.00);
 
 INSERT INTO loans (loan_number, initial_transaction_id, interest_rate, started_at, write_off) VALUES
 ('LOAN00000001', 1,  5.50000, 1700001000.00, FALSE),
