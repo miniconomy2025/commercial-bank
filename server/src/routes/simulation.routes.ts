@@ -73,7 +73,7 @@ const getStartingBalance = (): Observable<{ prime_rate: number; investment_value
       if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
         return res.data as { prime_rate: number; investment_value: number };
       } else {
-        return { prime_rate: 0.1, investment_value: 10000000000 }; // Default values if the request fails
+        return { prime_rate: 0.1, investment_value: 10000000000 };
       }
     }),
     catchError(() => of({ prime_rate: 0.1, investment_value: 10000000000 }))
