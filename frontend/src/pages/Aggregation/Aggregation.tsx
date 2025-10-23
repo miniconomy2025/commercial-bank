@@ -119,17 +119,9 @@ const AggregationContent = () => {
     if (isInitialLoadRef.current) return; // Skip polling during initial load
 
     try {
-      // Fetch new transactions for all selected accounts
-      const transactionPromises = selectedAccounts.map(async (accountId) => {
-        const account = accounts.find(a => a.id === accountId);
-        if (!account) return [];
-        
-        const response = await apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${account.name}`);
-        return response.success ? response.transactions : [];
-      });
-
-      const allTransactionArrays = await Promise.all(transactionPromises);
-      const allTransactions = allTransactionArrays.flat();
+      // Fetch all transactions to avoid duplicates
+      const response = await apiGet<{ success: boolean; transactions: Transaction[] }>('/dashboard/transactions');
+      const allTransactions = response.success ? response.transactions : [];
       
       // Filter transactions newer than our last known transaction
       const newTransactions = allTransactions.filter(t => 
@@ -180,25 +172,19 @@ const AggregationContent = () => {
           .filter(acc => acc.name !== 'commercial-bank' && acc.name !== 'thoh')
           .map(acc => acc.id));
         
-        // Fetch transactions for all accounts
-        const transactionPromises = fetchedAccounts.map(async (account) => {
-          try {
-            const response = await apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${account.name}`);
-            return response.success ? response.transactions : [];
-          } catch (err) {
-            console.error(`Error fetching transactions for account ${account.name}:`, err);
-            return [];
+        // Fetch all transactions once to avoid duplicates
+        try {
+          const response = await apiGet<{ success: boolean; transactions: Transaction[] }>('/dashboard/transactions');
+          const allTransactions = response.success ? response.transactions : [];
+        
+          setTransactions(allTransactions);
+          
+          // Update last transaction time
+          if (allTransactions.length > 0) {
+            lastTransactionTimeRef.current = Math.max(...allTransactions.map(t => Number(t.timestamp) || 0));
           }
-        });
-
-        const allTransactionArrays = await Promise.all(transactionPromises);
-        const allTransactions = allTransactionArrays.flat();
-        
-        setTransactions(allTransactions);
-        
-        // Update last transaction time
-        if (allTransactions.length > 0) {
-          lastTransactionTimeRef.current = Math.max(...allTransactions.map(t => Number(t.timestamp) || 0));
+        } catch (err) {
+          console.error('Error fetching transactions:', err);
         }
         
         isInitialLoadRef.current = false;
