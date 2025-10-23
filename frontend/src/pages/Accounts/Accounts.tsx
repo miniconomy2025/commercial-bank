@@ -8,44 +8,81 @@ import type { Account } from '../../types/Accounts';
 import Chart from '../../components/LineChart/LineChart';
 import type { Transaction } from '../../types/Transaction';
 
-const processLoanRepayments = (loans: any[]) => {
-  if (!loans.length) return { data: [], yKeys: [] };
+const processAccountBalance = (account: Account, transactions: any[], maxPoints = 15) => {
+  if (!transactions.length) return { data: [], yKeys: [] };
 
-  const sortedLoans = [...loans].sort((a, b) => parseFloat(a.started_at) - parseFloat(b.started_at));
+  const txns = transactions
+    .map(txn => ({
+      ...txn,
+      time: Number(txn.timestamp) || 0,
+      amount: Number(txn.amount) || 0,
+    }))
+    .filter(txn => !isNaN(txn.time) && !isNaN(txn.amount))
+    .sort((a, b) => a.time - b.time);
 
-  let timePoints: number[] = [];
-  sortedLoans.forEach(loan => {
-    const start = parseFloat(loan.started_at);
-    timePoints.push(start);
-    for (let i = 1; i <= 5; i++) {
-      timePoints.push(start + i * 30 * 24 * 3600);
+  let uniqueTimes = Array.from(new Set(txns.map(t => t.timestamp))).sort((a, b) => a - b);
+
+  if (uniqueTimes.length > maxPoints) {
+    const step = (uniqueTimes.length - 1) / (maxPoints - 1);
+    uniqueTimes = Array.from({ length: maxPoints }, (_, i) =>
+      uniqueTimes[Math.floor(i * step)]
+    );
+  }
+
+  let balance = 0;
+  let txnIndex = 0;
+
+  const data = uniqueTimes.map(time => {
+    while (txnIndex < txns.length && txns[txnIndex].time <= time) {
+      const txn = txns[txnIndex];
+      if (txn.from === account.name) balance -= txn.amount;
+      if (txn.to === account.name) balance += txn.amount;
+      txnIndex++;
     }
-  });
-  timePoints = Array.from(new Set(timePoints)).sort((a, b) => a - b);
-
-  const data = timePoints.map(time => {
-    const point: any = { epoch: time };
-    sortedLoans.forEach(loan => {
-      const start = parseFloat(loan.started_at);
-      const initialAmount = parseFloat(loan.initial_amount);
-      const outstanding = parseFloat(loan.outstanding_amount);
-      const totalRepaid = initialAmount - outstanding;
-
-      if (time < start) {
-        point[loan.loan_number] = 0;
-      } else if (time >= start + 5 * 30 * 24 * 3600) {
-        point[loan.loan_number] = totalRepaid;
-      } else {
-        const monthsPassed = (time - start) / (30 * 24 * 3600);
-        point[loan.loan_number] = Math.min(totalRepaid, (totalRepaid / 5) * monthsPassed);
-      }
-    });
-    return point;
+    return { epoch: time, [account.name]: balance };
   });
 
-  const yKeys = sortedLoans.map(loan => loan.loan_number);
+  return { data, yKeys: [account.name] };
+};
 
-  return { data, yKeys };
+const processLoanRepayments = (account: Account, transactions: any[], maxPoints = 15) => {
+  const loanTransactions = transactions.filter(t => 
+    t.description && t.description.includes('Repayment of loan')
+  );
+  
+  if (!loanTransactions.length) return { data: [], yKeys: [] };
+
+  const txns = loanTransactions
+    .map(txn => ({
+      ...txn,
+      time: Number(txn.timestamp) || 0,
+      amount: Number(txn.amount) || 0,
+    }))
+    .filter(txn => !isNaN(txn.time) && !isNaN(txn.amount))
+    .sort((a, b) => a.time - b.time);
+
+  let uniqueTimes = Array.from(new Set(txns.map(t => t.timestamp))).sort((a, b) => a - b);
+
+  if (uniqueTimes.length > maxPoints) {
+    const step = (uniqueTimes.length - 1) / (maxPoints - 1);
+    uniqueTimes = Array.from({ length: maxPoints }, (_, i) =>
+      uniqueTimes[Math.floor(i * step)]
+    );
+  }
+
+  let totalRepaid = 0;
+  let txnIndex = 0;
+
+  const data = uniqueTimes.map(time => {
+    while (txnIndex < txns.length && txns[txnIndex].time <= time) {
+      const txn = txns[txnIndex];
+      if (txn.from === account.name) totalRepaid += txn.amount;
+      txnIndex++;
+    }
+    return { epoch: time, 'Total Repaid': totalRepaid };
+  });
+
+  return { data, yKeys: ['Total Repaid'] };
 };
 
 const IndividualAccountContent = () => {
@@ -154,7 +191,11 @@ const IndividualAccountContent = () => {
       // Update accounts data (balances might have changed)
       const accountsResponse = await apiGet<{ success: boolean; accounts: Account[] }>('/dashboard/accounts');
       if (accountsResponse.success) {
-        updateAccounts(accountsResponse.accounts);
+        // Remove duplicates from response
+        const uniqueAccounts = accountsResponse.accounts.filter((account, index, self) => 
+          index === self.findIndex(a => a.id === account.id)
+        );
+        updateAccounts(uniqueAccounts);
       }
       
     } catch (err: any) {
@@ -175,10 +216,14 @@ const IndividualAccountContent = () => {
         }
 
         const fetchedAccounts = accountsResponse.accounts;
-        setAccounts(fetchedAccounts);
+        // Remove duplicates based on account id
+        const uniqueAccounts = fetchedAccounts.filter((account, index, self) => 
+          index === self.findIndex(a => a.id === account.id)
+        );
+        setAccounts(uniqueAccounts);
         
-        if (fetchedAccounts.length > 0) {
-          setSelectedAccounts([fetchedAccounts[0].id]);
+        if (uniqueAccounts.length > 0) {
+          setSelectedAccounts([uniqueAccounts[0].id]);
         }
         
         isInitialLoadRef.current = false;
@@ -265,7 +310,8 @@ const IndividualAccountContent = () => {
     };
   }, []);
 
-  const { data: loanChartData, yKeys: loanChartYKeys } = processLoanRepayments(loans);
+  const { data: balanceChartData, yKeys: balanceChartYKeys } = processAccountBalance(selectedAccount, transactions);
+  const { data: loanChartData, yKeys: loanChartYKeys } = processLoanRepayments(selectedAccount, transactions);
 
   const totalEquity = loans.reduce((sum, loan) => {
     const initialAmount = parseFloat(loan.initial_amount) || 0;
@@ -364,6 +410,12 @@ const IndividualAccountContent = () => {
 
             <div style={{ marginTop: '32px' }}>
               <PieChart loans={loans} title="Loan Breakdown" />
+              <Chart
+                title="Account balances over time"
+                data={balanceChartData}
+                xKey="epoch"
+                yKeys={balanceChartYKeys}
+              />
               <Chart
                 title="Loan Repayments over time"
                 data={loanChartData}

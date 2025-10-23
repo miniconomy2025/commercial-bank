@@ -270,6 +270,8 @@ export const repayLoan = async (
 
 // Charge interest on all outstanding loans
 export const chargeInterest = async () => {
+  logger.info('Starting interest collection process');
+  
   await db.tx(async t => {
     // Get all loans with outstanding balances
     const loansWithBalance = await t.manyOrNone<{
@@ -295,8 +297,17 @@ export const chargeInterest = async () => {
       HAVING init_tx.amount - COALESCE(SUM(rep_tx.amount), 0) > 0
     `);
 
+    logger.info(`Found ${loansWithBalance.length} loans with outstanding balances for interest collection`);
+
     const bankAccNo = await getCommercialBankAccountNumber(t);
-    if (!bankAccNo) return;
+    if (!bankAccNo) {
+      logger.error('Failed to get commercial bank account number');
+      return;
+    }
+
+    let totalInterestCollected = 0;
+    let successfulCharges = 0;
+    let writtenOffLoans = 0;
 
     // Charge interest on each loan
     for (const loan of loansWithBalance) {
@@ -304,9 +315,13 @@ export const chargeInterest = async () => {
       const interestRate = parseFloat(loan.interest_rate);
       const interestCharge = outstandingAmount * interestRate;
 
+      logger.info(`Processing loan ${loan.loan_number}: outstanding=${outstandingAmount}, rate=${interestRate}, charge=${interestCharge}`);
+
       if (interestCharge > 0) {
         // Check if borrower has sufficient funds for interest payment
         const borrowerBalance = await getAccountBalance(loan.account_number, t);
+        
+        logger.info(`Account ${loan.account_number} balance: ${borrowerBalance}, required: ${interestCharge}`);
         
         if (borrowerBalance != null && borrowerBalance >= interestCharge) {
           try {
@@ -329,6 +344,10 @@ export const chargeInterest = async () => {
             from: loan.account_number,
             to: bankAccNo
           });
+
+          totalInterestCollected += interestCharge;
+          successfulCharges++;
+          logger.info(`Successfully charged interest ${interestCharge} on loan ${loan.loan_number}`);
           } catch (error: any) {
             // If transaction fails due to insufficient funds, write off the loan
             if (error.code === 'check_violation' || error.message?.includes('Insufficient funds')) {
@@ -336,8 +355,10 @@ export const chargeInterest = async () => {
                 UPDATE loans SET write_off = TRUE WHERE id = $1
               `, [loan.loan_id]);
               
-              logger.info(`Loan ${loan.loan_number} written off due to insufficient funds for interest payment: ${error.message}`);
+              writtenOffLoans++;
+              logger.warn(`Loan ${loan.loan_number} written off due to transaction failure: ${error.message}`);
             } else {
+              logger.error(`Error charging interest on loan ${loan.loan_number}:`, error);
               throw error; // Re-throw other errors
             }
           }
@@ -347,10 +368,15 @@ export const chargeInterest = async () => {
             UPDATE loans SET write_off = TRUE WHERE id = $1
           `, [loan.loan_id]);
           
-          logger.info(`Loan ${loan.loan_number} written off due to insufficient funds for interest payment`);
+          writtenOffLoans++;
+          logger.warn(`Loan ${loan.loan_number} written off due to insufficient funds (balance: ${borrowerBalance}, required: ${interestCharge})`);
         }
+      } else {
+        logger.info(`Skipping loan ${loan.loan_number} - no interest charge calculated`);
       }
     }
+
+    logger.info(`Interest collection completed: ${successfulCharges} charges, total collected: ${totalInterestCollected}, ${writtenOffLoans} loans written off`);
   });
 };
 
@@ -361,9 +387,11 @@ export const chargeInterest = async () => {
 // NOTE: instalmentPercentage should be < balancePercentageThreshold to enable a forgiving repayment plan
 export const attemptInstalments = async (
   instalmentPercentage: number = 0.10,          // Instalment amount is calculated as 10% of the initial investment
-  balancePercentageThreshold: number = 0.075,    // Instalment will only be paid if it's < 7.5% of account balance
+  balancePercentageThreshold: number = 0.085,   // Instalment will only be paid if it's < 8.5% of account balance
   ignoreAccounts: Set<string> = new Set()       // Accounts to ignore when paying loans
 ) => {
+  logger.info(`Starting instalment collection process with ${instalmentPercentage * 100}% instalment rate and ${balancePercentageThreshold * 100}% balance threshold`);
+  
   await db.tx(async t => {
     // Get accounts with non-zero outstanding loan balance & not written off
     const accountsWithLoans = await t.manyOrNone<{ account_number: string }>(`
@@ -380,17 +408,31 @@ export const attemptInstalments = async (
       HAVING COALESCE(SUM(init_tx.amount), 0) - COALESCE(SUM(rep_tx.amount), 0) > 0
     `);
 
-    logger.info(`Found ${accountsWithLoans.length} accounts with outstanding loans`);
+    logger.info(`Found ${accountsWithLoans.length} accounts with outstanding loans for instalment processing`);
+    
+    if (ignoreAccounts.size > 0) {
+      logger.info(`Ignoring ${ignoreAccounts.size} accounts: [${Array.from(ignoreAccounts).join(', ')}]`);
+    }
+
+    let totalAccountsProcessed = 0;
+    let totalAccountsSkipped = 0;
+    let totalInstalmentsPaid = 0;
+    let totalAmountCollected = 0;
 
     // Loop through all accounts to determine credibility for instalment
     for (const { account_number } of accountsWithLoans) {
       // Skip ignored accounts
-      if (ignoreAccounts.has(account_number)) { continue; }
+      if (ignoreAccounts.has(account_number)) {
+        logger.info(`Skipping ignored account: ${account_number}`);
+        totalAccountsSkipped++;
+        continue;
+      }
 
       // Get account balance
       const balance = await getAccountBalance(account_number, t);
       if (balance == null) {
-        logger.info(`Account ${account_number} not found, skipping`);
+        logger.warn(`Account ${account_number} not found, skipping`);
+        totalAccountsSkipped++;
         continue;
       }
 
@@ -430,15 +472,18 @@ export const attemptInstalments = async (
         continue;
       }
 
+      logger.info(`Processing account ${account_number} with ${loans.length} outstanding loans`);
+
       // Calculate instalment total based on initial amounts (as per comment)
       const totalInitialAmount = loans.reduce((sum, loan) => sum + loan.initial_amount, 0);
       let instalTotal = totalInitialAmount * instalmentPercentage;
 
-      logger.info(`Account ${account_number}: balance=${balance}, threshold=${threshold}, instalTotal=${instalTotal}`);
+      logger.info(`Account ${account_number}: balance=${balance}, threshold=${threshold}, totalInitial=${totalInitialAmount}, instalTotal=${instalTotal}`);
 
       // If instalment amount exceeds threshold, skip this round
       if (instalTotal > threshold) {
         logger.info(`Instalment ${instalTotal} exceeds threshold ${threshold} for account ${account_number}, skipping`);
+        totalAccountsSkipped++;
         continue;
       }
 
@@ -447,28 +492,44 @@ export const attemptInstalments = async (
         b.interest_rate - a.interest_rate || b.outstanding_amount - a.outstanding_amount
       );
 
+      logger.info(`Loan priority order for ${account_number}: ${sortedLoans.map(l => `${l.loan_number}(${l.interest_rate}%)`).join(', ')}`);
+
       // Pay off as much as possible of each loan, whittling down instalTotal
       let totalPaid = 0;
+      let paymentsCount = 0;
       for (const loan of sortedLoans) {
-        if (instalTotal <= 0) break;
+        if (instalTotal <= 0) {
+          logger.info(`Instalment budget exhausted for account ${account_number}`);
+          break;
+        }
+        
         const payAmount = Math.min(loan.outstanding_amount, instalTotal);
+        logger.info(`Attempting payment of ${payAmount} on loan ${loan.loan_number} (outstanding: ${loan.outstanding_amount})`);
 
         if (payAmount > 0) {
           const result = await repayLoan(loan.loan_number, account_number, payAmount, t);
           if (result.success) {
             instalTotal -= payAmount;
             totalPaid += payAmount;
-            logger.info(`Paid ${payAmount} on loan ${loan.loan_number} for account ${account_number}`);
+            paymentsCount++;
+            logger.info(`Successfully paid ${payAmount} on loan ${loan.loan_number} for account ${account_number}`);
           } else {
             logger.error(`Failed to pay ${payAmount} on loan ${loan.loan_number} for account ${account_number}: ${result.error}`);
           }
         }
-
       }
       
       if (totalPaid > 0) {
-        logger.info(`Total installment payments for account ${account_number}: ${totalPaid}`);
+        logger.info(`Account ${account_number} completed: ${paymentsCount} payments totaling ${totalPaid}`);
+        totalInstalmentsPaid += paymentsCount;
+        totalAmountCollected += totalPaid;
+      } else {
+        logger.info(`No payments made for account ${account_number}`);
       }
+      
+      totalAccountsProcessed++;
     }
+
+    logger.info(`Instalment collection completed: ${totalAccountsProcessed} accounts processed, ${totalAccountsSkipped} skipped, ${totalInstalmentsPaid} payments made, total collected: ${totalAmountCollected}`);
   });
 };

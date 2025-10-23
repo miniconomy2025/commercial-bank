@@ -160,7 +160,7 @@ router.post("/prime_rate",async (req,res) =>{
   if (teamId!=="thoh"){
     res.status(400).json({ success: false, error: "onlyThohCanChangePrimeRate" });
   } else {
-    setLoanInterestRate(Number(prime_rate));
+    setLoanInterestRate(Number(prime_rate) / 300.0);
     res.status(200).json({ success: true, prime_rate });
   }
 });

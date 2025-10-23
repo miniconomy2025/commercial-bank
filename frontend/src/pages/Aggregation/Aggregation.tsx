@@ -119,17 +119,9 @@ const AggregationContent = () => {
     if (isInitialLoadRef.current) return; // Skip polling during initial load
 
     try {
-      // Fetch new transactions for all selected accounts
-      const transactionPromises = selectedAccounts.map(async (accountId) => {
-        const account = accounts.find(a => a.id === accountId);
-        if (!account) return [];
-        
-        const response = await apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${account.name}`);
-        return response.success ? response.transactions : [];
-      });
-
-      const allTransactionArrays = await Promise.all(transactionPromises);
-      const allTransactions = allTransactionArrays.flat();
+      // Fetch all transactions to avoid duplicates
+      const response = await apiGet<{ success: boolean; transactions: Transaction[] }>('/dashboard/transactions');
+      const allTransactions = response.success ? response.transactions : [];
       
       // Filter transactions newer than our last known transaction
       const newTransactions = allTransactions.filter(t => 
@@ -145,7 +137,11 @@ const AggregationContent = () => {
       if (accountsResponse.success) {
         setAccounts(prevAccounts => {
           const accountIds = new Set(prevAccounts.map(a => a.id));
-          const newAccounts = accountsResponse.accounts.filter(a => !accountIds.has(a.id));
+          // Remove duplicates from response
+          const uniqueResponseAccounts = accountsResponse.accounts.filter((account, index, self) => 
+            index === self.findIndex(a => a.id === account.id)
+          );
+          const newAccounts = uniqueResponseAccounts.filter(a => !accountIds.has(a.id));
           
           if (newAccounts.length === 0) {
             return prevAccounts; // No new accounts, return same reference
@@ -175,28 +171,28 @@ const AggregationContent = () => {
         }
 
         const fetchedAccounts = accountsResponse.accounts;
-        setAccounts(fetchedAccounts);
-        setSelectedAccounts(fetchedAccounts.map(acc => acc.id));
+        // Remove duplicates based on account id
+        const uniqueAccounts = fetchedAccounts.filter((account, index, self) => 
+          index === self.findIndex(a => a.id === account.id)
+        );
+        setAccounts(uniqueAccounts);
+        setSelectedAccounts(uniqueAccounts
+          .filter(acc => acc.name !== 'commercial-bank' && acc.name !== 'thoh')
+          .map(acc => acc.id));
         
-        // Fetch transactions for all accounts
-        const transactionPromises = fetchedAccounts.map(async (account) => {
-          try {
-            const response = await apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${account.name}`);
-            return response.success ? response.transactions : [];
-          } catch (err) {
-            console.error(`Error fetching transactions for account ${account.name}:`, err);
-            return [];
+        // Fetch all transactions once to avoid duplicates
+        try {
+          const response = await apiGet<{ success: boolean; transactions: Transaction[] }>('/dashboard/transactions');
+          const allTransactions = response.success ? response.transactions : [];
+        
+          setTransactions(allTransactions);
+          
+          // Update last transaction time
+          if (allTransactions.length > 0) {
+            lastTransactionTimeRef.current = Math.max(...allTransactions.map(t => Number(t.timestamp) || 0));
           }
-        });
-
-        const allTransactionArrays = await Promise.all(transactionPromises);
-        const allTransactions = allTransactionArrays.flat();
-        
-        setTransactions(allTransactions);
-        
-        // Update last transaction time
-        if (allTransactions.length > 0) {
-          lastTransactionTimeRef.current = Math.max(...allTransactions.map(t => Number(t.timestamp) || 0));
+        } catch (err) {
+          console.error('Error fetching transactions:', err);
         }
         
         isInitialLoadRef.current = false;
@@ -240,10 +236,20 @@ const AggregationContent = () => {
     );
   };
 
-  const { data: loanChartData, yKeys: loanChartYKeys } = processBalanceData(
+  const { data: balanceChartData, yKeys: balanceChartYKeys } = processBalanceData(
     accounts,
     selectedAccounts,
     transactions
+  );
+  
+  // For loan repayments, we need actual loan payment transactions
+  const loanTransactions = transactions.filter(t => 
+    t.description && t.description.includes('Repayment of loan')
+  );
+  const { data: loanChartData, yKeys: loanChartYKeys } = processBalanceData(
+    accounts,
+    selectedAccounts,
+    loanTransactions
   );
 
   if (error) {
@@ -266,6 +272,12 @@ const AggregationContent = () => {
             accounts={accounts}
           />
           <div className="chart-section">
+            <Chart
+                title="Account balances over time"
+                data={balanceChartData}
+                xKey="epoch"
+                yKeys={balanceChartYKeys}
+              />
             <Chart
                 title="Loan Repayments over time"
                 data={loanChartData}

@@ -45,16 +45,24 @@ router.post("/", async (req, res) => {
         }
 
         const { investmentValue, primeRate } = snakeToCamelCaseMapper(balanceData);
+        
+        if (investmentValue === undefined || investmentValue === null) {
+          res.status(400).json({ success: false, error: "invalidPayload", details: "investment_value is required" });
+          return;
+        }
         console.log(" - INVESTMENT VALUE:", investmentValue);
         console.log(" - PRIME RATE:", primeRate);
+
+        setLoanInterestRate(Number(primeRate) / 300.0);
+        setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) / 10);
 
         console.log("--------- RESETTING DB ----------")
         await resetDB(epochStartTime);
 
-        setLoanInterestRate(Number(primeRate));
-        setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);
         const fromAccountNumber = await getAccountFromTeamId('thoh').then(account => account?.account_number);
+
         initSimulation(epochStartTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
+
         const toAccountNumber = await getAccountFromTeamId('commercial-bank').then(account => account?.account_number);
         if (!toAccountNumber) {
             res.status(404).json({ success: false, error: "commercialBankAccountNotFound" });
@@ -64,7 +72,9 @@ router.post("/", async (req, res) => {
             res.status(404).json({ success: false, error: "thohAccountNotFound" });
             return;
         }
+
         await createTransaction(toAccountNumber, fromAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
+
         res.status(200).send({ success: true, route: `${appConfig.thohHost}/orders/payments` });
     } catch (error) {
         console.log("Error starting simulation:", error);

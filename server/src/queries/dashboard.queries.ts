@@ -30,7 +30,7 @@ export const getAllExistingTransactions = async (account: string | undefined): P
 
 export const getAllExistingAccounts = async (): Promise<AccountInfo[]> => {
   const results = await db.manyOrNone(`
-    SELECT 
+    SELECT DISTINCT
       a.id,
       a.account_number as account_number,
       a.team_id as name,
@@ -61,14 +61,24 @@ export const getAllExistingAccounts = async (): Promise<AccountInfo[]> => {
       ) outgoing ON ar.id = outgoing.account_ref_id
     ) account_totals ON a.account_number = account_totals.account_number
     WHERE a.closed_at IS NULL
+    ORDER BY a.team_id
   `);
   
-  return results.map(row => ({
-    ...row,
-    balance: parseFloat(row.balance),
-    income: parseFloat(row.income),
-    expenses: parseFloat(row.expenses)
-  }));
+  // Additional deduplication on the application side to ensure no duplicates
+  const uniqueAccounts = new Map();
+  results.forEach(row => {
+    const key = `${row.team_id}-${row.account_number}`;
+    if (!uniqueAccounts.has(key)) {
+      uniqueAccounts.set(key, {
+        ...row,
+        balance: parseFloat(row.balance),
+        income: parseFloat(row.income),
+        expenses: parseFloat(row.expenses)
+      });
+    }
+  });
+  
+  return Array.from(uniqueAccounts.values());
 };
 
 export const getAllAccountExpenses = async (accountId: number): Promise<Expense[]> => {
@@ -118,7 +128,7 @@ export type loan = {
 };
 
 export type AccountInfo = {
-  id: number;
+  id: string;
   account_number: string;
   name: string;
   balance: number;
