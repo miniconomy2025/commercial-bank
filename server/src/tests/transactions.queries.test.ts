@@ -66,11 +66,9 @@ describe("Transactions queries", () => {
       const accountTwoBeforeBalance = await getAccountBalance('200000000002');
 
       // Get account balance for the two accounts and check balances after the transaction
-      // {transaction_id: 43, transaction_number: '9664984837337809', status: 'success', timestamp: '35809920.00'} => successful transaction
       const result = await createTransaction('200000000001', '200000000002', 1000, "Test transaction", "commercial-bank", "commercial-bank");
       const resultKeys = Object.keys(result);
 
-      
     });
 
     it("should not create a transaction when sender has a less money than transaction amount", async () => {
@@ -80,15 +78,12 @@ describe("Transactions queries", () => {
       const accountTwoBeforeBalance = await getAccountBalance('200000000001');
 
       // Get account balance for the two accounts and check balances after the transaction
-      // {transaction_id: 43, transaction_number: '9664984837337809', status: 'success', timestamp: '35809920.00'} => successful transaction
       const result = await createTransaction('200000000001', '200000000001', 25, "Test transaction", "commercial-bank", "commercial-bank");
 
       
     });
   })
   
-
-
   describe("getAllTransactions", () => {
     it("get all transactions between account numbers", async () => {
 
