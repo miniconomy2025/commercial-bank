@@ -8,7 +8,9 @@ interface AccountFilterProps {
 }
 
 const AccountFilter: React.FC<AccountFilterProps> = ({ selectedAccounts, handleAccountToggle, accounts }) => {
-  const allSelected = accounts.length > 0 && selectedAccounts.length === accounts.length;
+  // Create a set of unique account IDs to handle potential duplicates
+  const uniqueAccountIds = new Set(accounts.map(account => account.id));
+  const allSelected = uniqueAccountIds.size > 0 && selectedAccounts.length === uniqueAccountIds.size;
   
   const handleSelectAll = () => {
     if (allSelected) {
@@ -16,9 +18,9 @@ const AccountFilter: React.FC<AccountFilterProps> = ({ selectedAccounts, handleA
       selectedAccounts.forEach(id => handleAccountToggle(id));
     } else {
       // Select all unselected accounts
-      accounts.forEach(account => {
-        if (!selectedAccounts.includes(account.id)) {
-          handleAccountToggle(account.id);
+      Array.from(uniqueAccountIds).forEach(accountId => {
+        if (!selectedAccounts.includes(accountId)) {
+          handleAccountToggle(accountId);
         }
       });
     }
@@ -43,23 +45,28 @@ const AccountFilter: React.FC<AccountFilterProps> = ({ selectedAccounts, handleA
         {allSelected ? 'Deselect All' : 'Select All'}
       </button>
       <div className="account-filter-list">
-        {accounts.map(account => (
-          <label key={account.id} className="account-filter-label">
-            <input
-              type="checkbox"
-              checked={selectedAccounts.includes(account.id)}
-              onChange={() => handleAccountToggle(account.id)}
-              style={{
-                width: '1rem',
-                height: '1rem',
-                accentColor: account.color,
-                cursor: 'pointer'
-              }}
-            />
+        {accounts
+          .filter((account, index, self) => 
+            index === self.findIndex(a => a.id === account.id)
+          )
+          .map(account => (
+            <label key={account.id} className="account-filter-label">
+              <input
+                type="checkbox"
+                checked={selectedAccounts.includes(account.id)}
+                onChange={() => handleAccountToggle(account.id)}
+                style={{
+                  width: '1rem',
+                  height: '1rem',
+                  accentColor: account.color,
+                  cursor: 'pointer'
+                }}
+              />
 
-            {account.name}
-          </label>
-        ))}
+              {account.name}
+            </label>
+          ))
+        }
       </div>
     </div>
   );
