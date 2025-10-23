@@ -62,25 +62,9 @@ describe("Transactions queries", () => {
     it("should not create a transaction when sender has a less money than transaction amount", async () => {
       if(!dbAvailable) return;
       
-      const accountOneBeforeBalance = await getAccountBalance('200000000001');
-      const accountTwoBeforeBalance = await getAccountBalance('200000000002');
-
-      // Get account balance for the two accounts and check balances after the transaction
-      const result = await createTransaction('200000000001', '200000000002', 1000, "Test transaction", "commercial-bank", "commercial-bank");
-      const resultKeys = Object.keys(result);
-
-    });
-
-    it("should not create a transaction when sender has a less money than transaction amount", async () => {
-      if(!dbAvailable) return;
-      
-      const accountOneBeforeBalance = await getAccountBalance('200000000001');
-      const accountTwoBeforeBalance = await getAccountBalance('200000000001');
-
-      // Get account balance for the two accounts and check balances after the transaction
-      const result = await createTransaction('200000000001', '200000000001', 25, "Test transaction", "commercial-bank", "commercial-bank");
-
-      
+      expect(async () => {
+        await createTransaction('200000000001', '200000000002', 1000, "Test transaction", "commercial-bank", "commercial-bank");
+      }).rejects.toThrow();
     });
   })
   
