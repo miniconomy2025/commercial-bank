@@ -22,7 +22,7 @@ services:
         condition: service_healthy
     volumes:
       - ../flyway:/flyway/sql
-    command: -url=jdbc:postgresql://postgres:5432/commercial-bank -user=postgres -password=postgres -locations=filesystem:/flyway/sql migrate
+    command: -url=jdbc:postgresql://postgres:5432/commercial-bank -user=postgres -password=postgres -locations=filesystem:/flyway/sql repair migrate
     environment:
       - FLYWAY_BASELINE_ON_MIGRATE=true
 
@@ -63,9 +63,11 @@ services:
     depends_on:
       - backend
     environment:
-      VITE_API_URL: http://backend:3000
+      VITE_API_URL: http://backend:3000/api
     ports:
       - "5173:5173"
+    networks:
+      - default
 
   test-runner:
     build:
@@ -84,6 +86,21 @@ services:
       FRONTEND_URL: http://frontend:5173
       TERM: xterm-256color
       FORCE_COLOR: 1
+
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    depends_on:
+      - backend
+      - frontend
+    environment:
+      FRONTEND_URL: http://localhost:5173
+      BACKEND_URL: http://localhost:3000
+    network_mode: "host"
+    volumes:
+      - ./tests:/app/tests
+      - ./playwright.config.ts:/app/playwright.config.ts
 
 volumes:
   postgres_data:

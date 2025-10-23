@@ -23,7 +23,7 @@ export const INTEREST_CHARGE_INTERVAL = 30;
 
 export function calcLoanInterestRate(primeRatePerYear: number, durationDays: number = INTEREST_CHARGE_INTERVAL): number {
   const prNorm = primeRatePerYear / 100.0;
-  const prPerDay = prNorm / 300.0;
+  const prPerDay = prNorm / 300.0; // approx. days in a year
   return prPerDay * durationDays;
 }
 
