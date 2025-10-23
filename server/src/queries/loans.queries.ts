@@ -34,8 +34,8 @@ export const getTotalOutstandingLoansForAccount = async (accountNumber: string, 
     JOIN transactions init_tx ON init_tx."to" = ar.id
     JOIN loans l ON l.initial_transaction_id = init_tx.id
     LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
-    LEFT JOIN transactions rep_tx ON lp_rep.transaction_id = rep_tx.id
-    WHERE a.account_number = $1
+    LEFT JOIN transactions rep_tx ON lp_rep.transaction_id = rep_tx.id AND rep_tx.status_id = 1
+    WHERE a.account_number = $1 AND init_tx.status_id = 1
   `, [accountNumber]);
   return result?.remaining ? parseFloat(result.remaining) : 0;
 };
@@ -49,8 +49,8 @@ export const getOutstandingLoanAmount = async (loanNumber: string, t?: ITask<{}>
     FROM loans l
     JOIN transactions init_tx ON init_tx.id = l.initial_transaction_id
     LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
-    LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id
-    WHERE l.loan_number = $1
+    LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id AND rep_tx.status_id = 1
+    WHERE l.loan_number = $1 AND init_tx.status_id = 1
     GROUP BY init_tx.amount
   `, [loanNumber]);
   return result?.outstanding ? parseFloat(result.outstanding) : 0;
@@ -358,9 +358,11 @@ export const chargeInterest = async () => {
 // - Calculate instalment as percentage of initial loan amounts (not outstanding)
 // - Only proceed if instalment amount is within account balance threshold
 // - Pay loans in order of highest interest rate first
+// NOTE: instalmentPercentage should be < balancePercentageThreshold to enable a forgiving repayment plan
 export const attemptInstalments = async (
   instalmentPercentage: number = 0.10,          // Instalment amount is calculated as 10% of the initial investment
-  balancePercentageThreshold: number = 0.05,    // Instalment will only be paid if it's < 5% of account balance
+  balancePercentageThreshold: number = 0.075,    // Instalment will only be paid if it's < 7.5% of account balance
+  ignoreAccounts: Set<string> = new Set()       // Accounts to ignore when paying loans
 ) => {
   await db.tx(async t => {
     // Get accounts with non-zero outstanding loan balance & not written off
@@ -372,8 +374,8 @@ export const attemptInstalments = async (
       JOIN transactions init_tx ON init_tx."to" = ar.id
       JOIN loans l ON l.initial_transaction_id = init_tx.id
       LEFT JOIN loan_payments lp ON lp.loan_id = l.id AND lp.is_interest = FALSE
-      LEFT JOIN transactions rep_tx ON lp.transaction_id = rep_tx.id
-      WHERE l.write_off = FALSE
+      LEFT JOIN transactions rep_tx ON lp.transaction_id = rep_tx.id AND rep_tx.status_id = 1
+      WHERE l.write_off = FALSE AND init_tx.status_id = 1
       GROUP BY a.account_number
       HAVING COALESCE(SUM(init_tx.amount), 0) - COALESCE(SUM(rep_tx.amount), 0) > 0
     `);
@@ -382,6 +384,8 @@ export const attemptInstalments = async (
 
     // Loop through all accounts to determine credibility for instalment
     for (const { account_number } of accountsWithLoans) {
+      // Skip ignored accounts
+      if (ignoreAccounts.has(account_number)) { continue; }
 
       // Get account balance
       const balance = await getAccountBalance(account_number, t);
@@ -408,8 +412,8 @@ export const attemptInstalments = async (
         JOIN transactions init_tx ON init_tx.id = l.initial_transaction_id
         JOIN account_refs ar ON init_tx."to" = ar.id
         LEFT JOIN loan_payments lp_rep ON lp_rep.loan_id = l.id AND lp_rep.is_interest = FALSE
-        LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id
-        WHERE ar.account_number = $1
+        LEFT JOIN transactions rep_tx ON rep_tx.id = lp_rep.transaction_id AND rep_tx.status_id = 1
+        WHERE ar.account_number = $1 AND init_tx.status_id = 1
         GROUP BY l.loan_number, init_tx.amount, l.interest_rate
         HAVING GREATEST(0, init_tx.amount - COALESCE(SUM(rep_tx.amount), 0)) > 0
       `, [account_number]);
@@ -448,6 +452,7 @@ export const attemptInstalments = async (
       for (const loan of sortedLoans) {
         if (instalTotal <= 0) break;
         const payAmount = Math.min(loan.outstanding_amount, instalTotal);
+
         if (payAmount > 0) {
           const result = await repayLoan(loan.loan_number, account_number, payAmount, t);
           if (result.success) {
@@ -458,6 +463,7 @@ export const attemptInstalments = async (
             logger.error(`Failed to pay ${payAmount} on loan ${loan.loan_number} for account ${account_number}: ${result.error}`);
           }
         }
+
       }
       
       if (totalPaid > 0) {
