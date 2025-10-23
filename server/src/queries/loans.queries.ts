@@ -2,6 +2,7 @@ import { ITask } from "pg-promise";
 import db from "../config/db.config";
 import { getSimTime, SimTime } from "../utils/time";
 import { getAccountBalance, getCommercialBankAccountNumber, getCommercialBankAccountRefId } from "./accounts.queries";
+import { logger } from '../utils/logger';
 import { createTransaction } from "./transactions.queries";
 import { sendNotification } from '../utils/notification';
 import { LoanDetails, LoanPayment, LoanResult, LoanSummary, RepaymentResult, Result, SimpleResult } from "../types/endpoint.types";
@@ -212,29 +213,31 @@ type RepayLoanResult = SimpleResult<RepaymentResult, "invalidRepaymentAmount" | 
 export const repayLoan = async (
   loanNumber: string,
   accountNumber: string,
-  amount: number
+  amount: number,
+  t?: ITask<{}>
 ): Promise<RepayLoanResult> => {
-  return db.tx<RepayLoanResult>(async (t) => {
+  let result: RepayLoanResult = { success: false, error: "internalError" };
 
+  const executeRepayment = async (tx: ITask<{}>) => {
     // Validate amount
-    if (amount <= 0) return { success: false, error: "invalidRepaymentAmount" };
+    if (amount <= 0) { result = { success: false, error: "invalidRepaymentAmount" }; return; }
 
     // Get loan ID
-    const loanId = await getLoanIdFromNumber(loanNumber, t);
-    if (loanId == null) return { success: false, error: "loanNotFound" };
+    const loanId = await getLoanIdFromNumber(loanNumber, tx);
+    if (loanId == null) { result = { success: false, error: "loanNotFound" }; return; }
 
     // Get commercial-bank account no.
-    const bankAccNo = await getCommercialBankAccountNumber(t);
-    if (bankAccNo == null) return { success: false, error: "internalError" };
+    const bankAccNo = await getCommercialBankAccountNumber(tx);
+    if (bankAccNo == null) { result = { success: false, error: "internalError" }; return; }
 
 
     // Get outstanding amount to pay
-    const outstanding = await getOutstandingLoanAmount(loanNumber, t);
+    const outstanding = await getOutstandingLoanAmount(loanNumber, tx);
     const repayment = Math.min(amount, outstanding); // Prevent overpayment
 
 
     // Create repayment transaction
-    const transaction = await createTransaction(accountNumber, bankAccNo, repayment, `Repayment of loan ${loanNumber}`);
+    const transaction = await createTransaction(bankAccNo, accountNumber, repayment, `Repayment of loan ${loanNumber}`, 'commercial-bank', 'commercial-bank', undefined, tx);
 
     // Send notification to recipient
     await sendNotification(accountNumber, {
@@ -248,15 +251,21 @@ export const repayLoan = async (
     });
 
     // Link repayment to the loan
-    await t.none(`
+    await tx.none(`
       INSERT INTO loan_payments (loan_id, transaction_id, is_interest)
       VALUES ($1, $2, false)
       `,
       [loanId, transaction.transaction_id]
     );
 
-    return { success: true, paid: repayment };
-  });
+    result = { success: true, paid: repayment };
+  };
+
+  // Use existing db transaction task if available
+  if (t != null) { await executeRepayment(t) }
+  else           { await db.tx(executeRepayment); }
+
+  return result;
 };
 
 // Charge interest on all outstanding loans
@@ -296,25 +305,50 @@ export const chargeInterest = async () => {
       const interestCharge = outstandingAmount * interestRate;
 
       if (interestCharge > 0) {
-        // Create interest charge transaction
-        const transaction = await createTransaction(bankAccNo, loan.account_number, interestCharge, `Interest charge on loan ${loan.loan_number}`);
+        // Check if borrower has sufficient funds for interest payment
+        const borrowerBalance = await getAccountBalance(loan.account_number, t);
+        
+        if (borrowerBalance != null && borrowerBalance >= interestCharge) {
+          try {
+          // Create interest charge transaction
+          const transaction = await createTransaction(bankAccNo, loan.account_number, interestCharge, `Interest charge on loan ${loan.loan_number}`);
 
-        // Link interest charge to the loan
-        await t.none(`
-          INSERT INTO loan_payments (loan_id, transaction_id, is_interest)
-          VALUES ($1, $2, true)
-        `, [loan.loan_id, transaction.transaction_id]);
+          // Link interest charge to the loan
+          await t.none(`
+            INSERT INTO loan_payments (loan_id, transaction_id, is_interest)
+            VALUES ($1, $2, true)
+          `, [loan.loan_id, transaction.transaction_id]);
 
-        // Send notification
-        await sendNotification(loan.account_number, {
-          transaction_number: transaction.transaction_number,
-          status: transaction.status || 'success',
-          amount: interestCharge,
-          timestamp: Number(getSimTime()),
-          description: `Interest charge on loan ${loan.loan_number}`,
-          from: bankAccNo,
-          to: loan.account_number
-        });
+          // Send notification
+          await sendNotification(loan.account_number, {
+            transaction_number: transaction.transaction_number,
+            status: transaction.status || 'success',
+            amount: interestCharge,
+            timestamp: Number(getSimTime()),
+            description: `Interest charge on loan ${loan.loan_number}`,
+            from: loan.account_number,
+            to: bankAccNo
+          });
+          } catch (error: any) {
+            // If transaction fails due to insufficient funds, write off the loan
+            if (error.code === 'check_violation' || error.message?.includes('Insufficient funds')) {
+              await t.none(`
+                UPDATE loans SET write_off = TRUE WHERE id = $1
+              `, [loan.loan_id]);
+              
+              logger.info(`Loan ${loan.loan_number} written off due to insufficient funds for interest payment: ${error.message}`);
+            } else {
+              throw error; // Re-throw other errors
+            }
+          }
+        } else {
+          // Insufficient funds - write off the loan
+          await t.none(`
+            UPDATE loans SET write_off = TRUE WHERE id = $1
+          `, [loan.loan_id]);
+          
+          logger.info(`Loan ${loan.loan_number} written off due to insufficient funds for interest payment`);
+        }
       }
     }
   });
@@ -344,12 +378,17 @@ export const attemptInstalments = async (
       HAVING COALESCE(SUM(init_tx.amount), 0) - COALESCE(SUM(rep_tx.amount), 0) > 0
     `);
 
+    logger.info(`Found ${accountsWithLoans.length} accounts with outstanding loans`);
+
     // Loop through all accounts to determine credibility for instalment
     for (const { account_number } of accountsWithLoans) {
 
       // Get account balance
-      const balance = await getAccountBalance(account_number);
-      if (balance == null) continue; // Account does not exist
+      const balance = await getAccountBalance(account_number, t);
+      if (balance == null) {
+        logger.info(`Account ${account_number} not found, skipping`);
+        continue;
+      }
 
       const threshold = balance * balancePercentageThreshold;
 
@@ -382,14 +421,22 @@ export const attemptInstalments = async (
         interest_rate: parseFloat(loan.interest_rate)
       }));
 
-      if (loans.length === 0) continue; // No loans on this account
+      if (loans.length === 0) {
+        logger.info(`No outstanding loans for account ${account_number}`);
+        continue;
+      }
 
       // Calculate instalment total based on initial amounts (as per comment)
       const totalInitialAmount = loans.reduce((sum, loan) => sum + loan.initial_amount, 0);
       let instalTotal = totalInitialAmount * instalmentPercentage;
 
+      logger.info(`Account ${account_number}: balance=${balance}, threshold=${threshold}, instalTotal=${instalTotal}`);
+
       // If instalment amount exceeds threshold, skip this round
-      if (instalTotal > threshold) continue;
+      if (instalTotal > threshold) {
+        logger.info(`Instalment ${instalTotal} exceeds threshold ${threshold} for account ${account_number}, skipping`);
+        continue;
+      }
 
       // Sort loans by highest interest rate, then highest outstanding amount
       const sortedLoans = loans.sort((a, b) =>
@@ -397,13 +444,24 @@ export const attemptInstalments = async (
       );
 
       // Pay off as much as possible of each loan, whittling down instalTotal
+      let totalPaid = 0;
       for (const loan of sortedLoans) {
         if (instalTotal <= 0) break;
         const payAmount = Math.min(loan.outstanding_amount, instalTotal);
         if (payAmount > 0) {
-          await repayLoan(loan.loan_number, account_number, payAmount);
-          instalTotal -= payAmount;
+          const result = await repayLoan(loan.loan_number, account_number, payAmount, t);
+          if (result.success) {
+            instalTotal -= payAmount;
+            totalPaid += payAmount;
+            logger.info(`Paid ${payAmount} on loan ${loan.loan_number} for account ${account_number}`);
+          } else {
+            logger.error(`Failed to pay ${payAmount} on loan ${loan.loan_number} for account ${account_number}: ${result.error}`);
+          }
         }
+      }
+      
+      if (totalPaid > 0) {
+        logger.info(`Total installment payments for account ${account_number}: ${totalPaid}`);
       }
     }
   });

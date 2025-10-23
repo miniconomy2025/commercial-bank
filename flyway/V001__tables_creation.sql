@@ -51,3 +51,40 @@ CREATE TABLE loan_payments (
     transaction_id INT NOT NULL UNIQUE REFERENCES transactions(id) ON DELETE CASCADE,
     is_interest BOOLEAN NOT NULL
 );
+
+-- Validate non-negative balances
+CREATE OR REPLACE FUNCTION validate_transaction_balance()
+RETURNS TRIGGER AS $$
+DECLARE
+    sender_balance NUMERIC;
+    sender_account_number VARCHAR;
+    sender_bank_id INT;
+BEGIN
+    -- Get sender account details
+    SELECT ar.account_number, ar.bank_id 
+    INTO sender_account_number, sender_bank_id
+    FROM account_refs ar 
+    WHERE ar.id = NEW."from";
+    
+    -- Only validate for commercial-bank accounts (bank_id = 1)
+    IF sender_bank_id = 1 THEN
+        -- Calculate current balance for sender
+        sender_balance := get_account_balance(sender_account_number);
+        
+        -- Check if transaction would cause negative balance
+        IF sender_balance IS NOT NULL AND sender_balance < NEW.amount THEN
+            RAISE EXCEPTION 'Insufficient funds: account % has balance % but transaction requires %', 
+                sender_account_number, sender_balance, NEW.amount
+                USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to validate balance before inserting transactions
+CREATE TRIGGER validate_balance_before_transaction
+    BEFORE INSERT ON transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_transaction_balance();

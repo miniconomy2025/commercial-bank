@@ -21,10 +21,10 @@ const httpClient = new HttpClient();
 async function onEachDay() {
   try {
     logger.info('Daily loan processing started');
-    await chargeInterest();
-    logger.info('Interest charging completed');
     await attemptInstalments();
     logger.info('Installment processing completed');
+    await chargeInterest();
+    logger.info('Interest charging completed');
   } catch (error) {
     logger.error('Error in daily loan processing:', error);
   }
