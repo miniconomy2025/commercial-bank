@@ -18,8 +18,14 @@ import appConfig from "../config/app.config";
 const router = Router();
 const httpClient = new HttpClient();
 
-export const PRIME_RATE_DIVISOR = 300.0;
-export const INTEREST_CHARGE_INTERVAL = 5;
+export const PRIME_RATE_DIVISOR = 3;
+export const INTEREST_CHARGE_INTERVAL = 30;
+
+export function calcLoanInterestRate(primeRatePerYear: number, durationDays: number = INTEREST_CHARGE_INTERVAL): number {
+  const prNorm = primeRatePerYear / 100.0;
+  const prPerDay = prNorm / 300.0;
+  return prPerDay * durationDays;
+}
 
 let dayCounter = 0;
 
@@ -30,7 +36,7 @@ async function onEachDay() {
     await attemptInstalments();
     logger.info('Installment processing completed');
 
-    if (dayCounter % INTEREST_CHARGE_INTERVAL == 0) {
+    if (dayCounter !== 0 && dayCounter % INTEREST_CHARGE_INTERVAL == 0) {
       await chargeInterest();
       logger.info(`Interest collected on day ${dayCounter}`);
     }
@@ -65,7 +71,7 @@ router.post("/", async (req, res) => {
         console.log(" - INVESTMENT VALUE:", investmentValue);
         console.log(" - PRIME RATE:", primeRate);
 
-        setLoanInterestRate(Number(primeRate) / (PRIME_RATE_DIVISOR / (INTEREST_CHARGE_INTERVAL + 1)));
+        setLoanInterestRate(calcLoanInterestRate(Number(primeRate)));
         setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) / 10);
 
         console.log("--------- RESETTING DB ----------")
