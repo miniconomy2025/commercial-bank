@@ -146,7 +146,7 @@ const AggregationContent = () => {
         });
       }
       
-    } catch (err: any) {
+    } catch (err) {
       console.error('Polling error:', err);
     } finally {
       setIsPolling(false);
@@ -190,8 +190,8 @@ const AggregationContent = () => {
         }
         
         isInitialLoadRef.current = false;
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
         isInitialLoadRef.current = false;
       }
     };

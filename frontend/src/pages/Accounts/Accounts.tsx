@@ -7,9 +7,10 @@ import { apiGet } from '../../services/api';
 import type { Account } from '../../types/Accounts';
 import Chart from '../../components/LineChart/LineChart';
 import type { Transaction } from '../../types/Transaction';
+import type { Loan } from '../../types/Loan';
 import { usePolling } from '../../hooks/usePolling';
 
-const processAccountBalance = (account: Account, transactions: any[], maxPoints = 15) => {
+const processAccountBalance = (account: Account, transactions: Transaction[], maxPoints = 15) => {
   if (!transactions.length) return { data: [], yKeys: [] };
 
   const txns = transactions
@@ -46,7 +47,7 @@ const processAccountBalance = (account: Account, transactions: any[], maxPoints 
   return { data, yKeys: [account.name] };
 };
 
-const processLoanRepayments = (account: Account, transactions: any[], maxPoints = 15) => {
+const processLoanRepayments = (account: Account, transactions: Transaction[], maxPoints = 15) => {
   const loanTransactions = transactions.filter(t => 
     t.description && t.description.includes('Repayment of loan')
   );
@@ -89,8 +90,8 @@ const processLoanRepayments = (account: Account, transactions: any[], maxPoints 
 const IndividualAccountContent = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loans, setLoans] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
@@ -102,30 +103,30 @@ const IndividualAccountContent = () => {
 
   const selectedAccount = accounts.find(acc => selectedAccounts.includes(acc.id)) || accounts[0];
 
-  const updateTransactions = useCallback((newTransactions: any[]) => {
+  const updateTransactions = useCallback((newTransactions: Transaction[]) => {
     setTransactions(prevTransactions => {
       const existingIds = new Set(prevTransactions.map(t => 
-        t.transaction_number || t.id || `${t.timestamp || t.time}-${t.amount}-${t.from}-${t.to}`
+        t.transaction_number || `${t.timestamp}-${t.amount}-${t.from}-${t.to}`
       ));
       const uniqueNewTransactions = newTransactions.filter(t => 
-        !existingIds.has(t.transaction_number || t.id || `${t.timestamp || t.time}-${t.amount}-${t.from}-${t.to}`)
+        !existingIds.has(t.transaction_number || `${t.timestamp}-${t.amount}-${t.from}-${t.to}`)
       );
       
       if (uniqueNewTransactions.length === 0) {
         return prevTransactions;
       }
       
-      const latestTime = Math.max(...newTransactions.map(t => Number(t.timestamp || t.time) || 0));
+      const latestTime = Math.max(...newTransactions.map(t => Number(t.timestamp) || 0));
       lastTransactionTimeRef.current = Math.max(lastTransactionTimeRef.current, latestTime);
       
       return [...prevTransactions, ...uniqueNewTransactions].sort((a, b) => 
-        (Number(a.timestamp || a.time) || 0) - (Number(b.timestamp || b.time) || 0)
+        (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0)
       );
     });
   }, []);
 
   // Memoized function to update loans without causing re-renders
-  const updateLoans = useCallback((newLoans: any[]) => {
+  const updateLoans = useCallback((newLoans: Loan[]) => {
     setLoans(prevLoans => {
       // Check if there are any changes in loan data
       const loansChanged = newLoans.some(newLoan => {
@@ -173,11 +174,11 @@ const IndividualAccountContent = () => {
       const currentAccount = accounts.find(a => a.id === currentAccountRef.current);
       if (!currentAccount) return;
 
-      const transactionsResponse = await apiGet<{ success: boolean; transactions: any[] }>(`/dashboard/transactions?account=${currentAccount.name}`);
+      const transactionsResponse = await apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${currentAccount.name}`);
       
       if (transactionsResponse.success) {
         const newTransactions = transactionsResponse.transactions.filter(t => 
-          Number(t.timestamp || t.time) > lastTransactionTimeRef.current
+          Number(t.timestamp) > lastTransactionTimeRef.current
         );
         
         if (newTransactions.length > 0) {
@@ -185,7 +186,7 @@ const IndividualAccountContent = () => {
         }
       }
       
-      const loansResponse = await apiGet<{ success: boolean; loans: any[] }>(`/dashboard/loans?accountNumber=${currentAccount.account_number}`);
+      const loansResponse = await apiGet<{ success: boolean; loans: Loan[] }>(`/dashboard/loans?accountNumber=${currentAccount.account_number}`);
       if (loansResponse.success) {
         updateLoans(loansResponse.loans);
       }
@@ -198,7 +199,7 @@ const IndividualAccountContent = () => {
         updateAccounts(uniqueAccounts);
       }
       
-    } catch (err: any) {
+    } catch (err) {
       console.error('Polling error:', err);
     } finally {
       setIsPolling(false);
@@ -228,8 +229,8 @@ const IndividualAccountContent = () => {
         }
         
         isInitialLoadRef.current = false;
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
         isInitialLoadRef.current = false;
       } finally {
         setIsLoading(false);
@@ -250,7 +251,7 @@ const IndividualAccountContent = () => {
         
         const [transactionsResponse, loansResponse] = await Promise.all([
           apiGet<{ success: boolean; transactions: Transaction[] }>(`/dashboard/transactions?account=${selectedAccount.name}`),
-          apiGet<{ success: boolean; loans: any[] }>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`)
+          apiGet<{ success: boolean; loans: Loan[] }>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`)
         ]);
         
         if (transactionsResponse.success) {
@@ -258,7 +259,7 @@ const IndividualAccountContent = () => {
           
           // Update last transaction time
           if (transactionsResponse.transactions.length > 0) {
-            lastTransactionTimeRef.current = Math.max(...transactionsResponse.transactions.map(t => Number(t.timestamp || t.time) || 0));
+            lastTransactionTimeRef.current = Math.max(...transactionsResponse.transactions.map(t => Number(t.timestamp) || 0));
           }
         } else {
           console.error('Failed to fetch transactions:', transactionsResponse);
@@ -272,9 +273,9 @@ const IndividualAccountContent = () => {
           setLoans([]);
         }
         
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching account data:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setIsTransactionsLoading(false);
       }
