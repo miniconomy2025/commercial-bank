@@ -18,13 +18,24 @@ import appConfig from "../config/app.config";
 const router = Router();
 const httpClient = new HttpClient();
 
+export const PRIME_RATE_DIVISOR = 300.0;
+export const INTEREST_CHARGE_INTERVAL = 5;
+
+let dayCounter = 0;
+
 async function onEachDay() {
   try {
     logger.info('Daily loan processing started');
+
     await attemptInstalments();
     logger.info('Installment processing completed');
-    await chargeInterest();
-    logger.info('Interest charging completed');
+
+    if (dayCounter % INTEREST_CHARGE_INTERVAL == 0) {
+      await chargeInterest();
+      logger.info(`Interest collected on day ${dayCounter}`);
+    }
+    else { logger.info(`No interest collected on day ${dayCounter}`); }
+
   } catch (error) {
     logger.error('Error in daily loan processing:', error);
   }
@@ -33,6 +44,7 @@ async function onEachDay() {
 router.post("/", async (req, res) => {
   console.log("========== START SIMULATION ==========")
     try {
+        dayCounter = 0;
         const { epochStartTime } = snakeToCamelCaseMapper(req.body);
         console.log(" - START TIME:", epochStartTime);
 
@@ -53,7 +65,7 @@ router.post("/", async (req, res) => {
         console.log(" - INVESTMENT VALUE:", investmentValue);
         console.log(" - PRIME RATE:", primeRate);
 
-        setLoanInterestRate(Number(primeRate) / 300.0);
+        setLoanInterestRate(Number(primeRate) / (PRIME_RATE_DIVISOR / (INTEREST_CHARGE_INTERVAL + 1)));
         setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) / 10);
 
         console.log("--------- RESETTING DB ----------")
