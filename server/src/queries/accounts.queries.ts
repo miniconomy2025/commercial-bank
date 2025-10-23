@@ -77,7 +77,10 @@ export const getAccountInformation = async (teamId: string): Promise<AccountInfo
       net_balance: parseFloat(result.net_balance),
     };
   }
-  catch (error: any) { return error.message }
+  catch (error: any) { 
+    console.error('Error in getAccountInformation:', error);
+    return null;
+  }
 }
 
 export const getAccountNotificationUrl = async (accountNumber: string): Promise<string | null> => {
