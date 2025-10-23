@@ -176,7 +176,9 @@ const AggregationContent = () => {
 
         const fetchedAccounts = accountsResponse.accounts;
         setAccounts(fetchedAccounts);
-        setSelectedAccounts(fetchedAccounts.map(acc => acc.id));
+        setSelectedAccounts(fetchedAccounts
+          .filter(acc => acc.name !== 'commercial-bank' && acc.name !== 'thoh')
+          .map(acc => acc.id));
         
         // Fetch transactions for all accounts
         const transactionPromises = fetchedAccounts.map(async (account) => {
