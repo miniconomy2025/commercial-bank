@@ -60,7 +60,7 @@ export const getAllExistingAccounts = async (): Promise<AccountInfo[]> => {
         GROUP BY t."from"
       ) outgoing ON ar.id = outgoing.account_ref_id
     ) account_totals ON a.account_number = account_totals.account_number
-    WHERE a.closed_at IS NULL AND a.team_id NOT LIKE 'commercial-bank' AND a.team_id NOT LIKE 'thoh' 
+    WHERE a.closed_at IS NULL
   `);
   
   return results.map(row => ({

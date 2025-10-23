@@ -27,6 +27,8 @@ services:
       - FLYWAY_BASELINE_ON_MIGRATE=true
 
   backend:
+    stdin_open: true
+    tty: true
     build:
       context: ../server
       dockerfile: ../test-env/Dockerfile.backend

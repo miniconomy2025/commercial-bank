@@ -21,10 +21,10 @@ const httpClient = new HttpClient();
 
 router.get("/", async (req: Request<{}, {}, Get_Transaction_Req>, res: Response<Get_Transaction_Res>) => {
   try {
-    const from = req.account!.account_number;
-    const to = (req.query.to as string);
+    const accountNumber = req.account!.account_number;
+    const to = req.query.to as string | undefined;
     const onlySuccessful = req.query.onlySuccessful === 'true';
-    const transactions = await getAllTransactions(from, to, onlySuccessful);
+    const transactions = await getAllTransactions(accountNumber, to, onlySuccessful);
     res.status(200).json({ success: true, transactions });
   } catch (error) {
     logger.error("Error fetching transactions:", error);

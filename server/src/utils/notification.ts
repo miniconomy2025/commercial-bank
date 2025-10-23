@@ -21,7 +21,7 @@ export const sendNotification = async (
   const httpClient = new HttpClient();
   try {
     httpClient.post(notificationUrl, payload);
-    logger.info(`Notification sent to ${toAccountNumber} at ${notificationUrl}`);
+    // logger.info(`Notification sent to ${toAccountNumber} at ${notificationUrl}`);
   } catch (err) {
     logger.error(`Failed to send notification to ${toAccountNumber}:`, err);
   }
