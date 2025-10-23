@@ -191,7 +191,11 @@ const IndividualAccountContent = () => {
       // Update accounts data (balances might have changed)
       const accountsResponse = await apiGet<{ success: boolean; accounts: Account[] }>('/dashboard/accounts');
       if (accountsResponse.success) {
-        updateAccounts(accountsResponse.accounts);
+        // Remove duplicates from response
+        const uniqueAccounts = accountsResponse.accounts.filter((account, index, self) => 
+          index === self.findIndex(a => a.id === account.id)
+        );
+        updateAccounts(uniqueAccounts);
       }
       
     } catch (err: any) {
@@ -212,10 +216,14 @@ const IndividualAccountContent = () => {
         }
 
         const fetchedAccounts = accountsResponse.accounts;
-        setAccounts(fetchedAccounts);
+        // Remove duplicates based on account id
+        const uniqueAccounts = fetchedAccounts.filter((account, index, self) => 
+          index === self.findIndex(a => a.id === account.id)
+        );
+        setAccounts(uniqueAccounts);
         
-        if (fetchedAccounts.length > 0) {
-          setSelectedAccounts([fetchedAccounts[0].id]);
+        if (uniqueAccounts.length > 0) {
+          setSelectedAccounts([uniqueAccounts[0].id]);
         }
         
         isInitialLoadRef.current = false;

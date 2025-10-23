@@ -137,7 +137,11 @@ const AggregationContent = () => {
       if (accountsResponse.success) {
         setAccounts(prevAccounts => {
           const accountIds = new Set(prevAccounts.map(a => a.id));
-          const newAccounts = accountsResponse.accounts.filter(a => !accountIds.has(a.id));
+          // Remove duplicates from response
+          const uniqueResponseAccounts = accountsResponse.accounts.filter((account, index, self) => 
+            index === self.findIndex(a => a.id === account.id)
+          );
+          const newAccounts = uniqueResponseAccounts.filter(a => !accountIds.has(a.id));
           
           if (newAccounts.length === 0) {
             return prevAccounts; // No new accounts, return same reference
@@ -167,8 +171,12 @@ const AggregationContent = () => {
         }
 
         const fetchedAccounts = accountsResponse.accounts;
-        setAccounts(fetchedAccounts);
-        setSelectedAccounts(fetchedAccounts
+        // Remove duplicates based on account id
+        const uniqueAccounts = fetchedAccounts.filter((account, index, self) => 
+          index === self.findIndex(a => a.id === account.id)
+        );
+        setAccounts(uniqueAccounts);
+        setSelectedAccounts(uniqueAccounts
           .filter(acc => acc.name !== 'commercial-bank' && acc.name !== 'thoh')
           .map(acc => acc.id));
         
