@@ -7,6 +7,7 @@ import { apiGet } from '../../services/api';
 import type { Account } from '../../types/Accounts';
 import Chart from '../../components/LineChart/LineChart';
 import type { Transaction } from '../../types/Transaction';
+import { usePolling } from '../../hooks/usePolling';
 
 const processAccountBalance = (account: Account, transactions: any[], maxPoints = 15) => {
   if (!transactions.length) return { data: [], yKeys: [] };
@@ -93,8 +94,8 @@ const IndividualAccountContent = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
 
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastTransactionTimeRef = useRef<number>(0);
   const isInitialLoadRef = useRef(true);
   const currentAccountRef = useRef<string | null>(null);
@@ -103,22 +104,22 @@ const IndividualAccountContent = () => {
 
   const updateTransactions = useCallback((newTransactions: any[]) => {
     setTransactions(prevTransactions => {
-      const existingIds = new Set(prevTransactions.map(t => t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`));
+      const existingIds = new Set(prevTransactions.map(t => 
+        t.transaction_number || t.id || `${t.timestamp || t.time}-${t.amount}-${t.from}-${t.to}`
+      ));
       const uniqueNewTransactions = newTransactions.filter(t => 
-        !existingIds.has(t.id || `${t.time}-${t.amount}-${t.from}-${t.to}`)
+        !existingIds.has(t.transaction_number || t.id || `${t.timestamp || t.time}-${t.amount}-${t.from}-${t.to}`)
       );
       
       if (uniqueNewTransactions.length === 0) {
-        return prevTransactions; // No new transactions, return same reference
+        return prevTransactions;
       }
       
-      // Update last transaction time
-      const latestTime = Math.max(...newTransactions.map(t => Number(t.time) || 0));
+      const latestTime = Math.max(...newTransactions.map(t => Number(t.timestamp || t.time) || 0));
       lastTransactionTimeRef.current = Math.max(lastTransactionTimeRef.current, latestTime);
       
-      // Return new array with appended transactions
       return [...prevTransactions, ...uniqueNewTransactions].sort((a, b) => 
-        (Number(a.time) || 0) - (Number(b.time) || 0)
+        (Number(a.timestamp || a.time) || 0) - (Number(b.timestamp || b.time) || 0)
       );
     });
   }, []);
@@ -165,16 +166,18 @@ const IndividualAccountContent = () => {
 
   // Polling function that only fetches new data
   const pollForUpdates = useCallback(async () => {
-    if (isInitialLoadRef.current || !selectedAccount) return;
+    if (isInitialLoadRef.current || !currentAccountRef.current) return;
 
     try {
-      // Fetch new transactions for current account since last update
-      const transactionsResponse = await apiGet<{ success: boolean; transactions: any[] }>(`/dashboard/transactions?account=${selectedAccount.name}`);
+      setIsPolling(true);
+      const currentAccount = accounts.find(a => a.id === currentAccountRef.current);
+      if (!currentAccount) return;
+
+      const transactionsResponse = await apiGet<{ success: boolean; transactions: any[] }>(`/dashboard/transactions?account=${currentAccount.name}`);
       
       if (transactionsResponse.success) {
-        // Filter transactions newer than our last known transaction
         const newTransactions = transactionsResponse.transactions.filter(t => 
-          Number(t.time) > lastTransactionTimeRef.current
+          Number(t.timestamp || t.time) > lastTransactionTimeRef.current
         );
         
         if (newTransactions.length > 0) {
@@ -182,16 +185,13 @@ const IndividualAccountContent = () => {
         }
       }
       
-      // Update loans data (check for changes in outstanding amounts)
-      const loansResponse = await apiGet<{ success: boolean; loans: any[] }>(`/dashboard/loans?accountNumber=${selectedAccount.account_number}`);
+      const loansResponse = await apiGet<{ success: boolean; loans: any[] }>(`/dashboard/loans?accountNumber=${currentAccount.account_number}`);
       if (loansResponse.success) {
         updateLoans(loansResponse.loans);
       }
       
-      // Update accounts data (balances might have changed)
       const accountsResponse = await apiGet<{ success: boolean; accounts: Account[] }>('/dashboard/accounts');
       if (accountsResponse.success) {
-        // Remove duplicates from response
         const uniqueAccounts = accountsResponse.accounts.filter((account, index, self) => 
           index === self.findIndex(a => a.id === account.id)
         );
@@ -200,9 +200,10 @@ const IndividualAccountContent = () => {
       
     } catch (err: any) {
       console.error('Polling error:', err);
-      // Don't update error state to avoid re-renders, just log
+    } finally {
+      setIsPolling(false);
     }
-  }, [selectedAccount, updateTransactions, updateLoans, updateAccounts]);
+  }, [updateTransactions, updateLoans, updateAccounts, accounts]);
 
   // Initial accounts fetch
   useEffect(() => {
@@ -257,7 +258,7 @@ const IndividualAccountContent = () => {
           
           // Update last transaction time
           if (transactionsResponse.transactions.length > 0) {
-            lastTransactionTimeRef.current = Math.max(...transactionsResponse.transactions.map(t => Number(t.timestamp) || 0));
+            lastTransactionTimeRef.current = Math.max(...transactionsResponse.transactions.map(t => Number(t.timestamp || t.time) || 0));
           }
         } else {
           console.error('Failed to fetch transactions:', transactionsResponse);
@@ -282,33 +283,11 @@ const IndividualAccountContent = () => {
     fetchAccountData();
   }, [selectedAccount]);
 
-  // Setup polling
-  useEffect(() => {
-    if (isInitialLoadRef.current || !selectedAccount) return;
-
-    // Clear existing interval
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-    }
-
-    // Start polling every 5 seconds (adjust as needed)
-    pollingIntervalRef.current = setInterval(pollForUpdates, 5000);
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, [pollForUpdates, selectedAccount]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, []);
+  // Setup polling with custom hook
+  usePolling(pollForUpdates, {
+    enabled: !isInitialLoadRef.current && !!currentAccountRef.current,
+    interval: 3000
+  });
 
   const { data: balanceChartData, yKeys: balanceChartYKeys } = processAccountBalance(selectedAccount, transactions);
   const { data: loanChartData, yKeys: loanChartYKeys } = processLoanRepayments(selectedAccount, transactions);
@@ -362,6 +341,21 @@ const IndividualAccountContent = () => {
 
   return (
     <main className="account-content">
+      {isPolling && (
+        <div style={{ 
+          position: 'fixed', 
+          top: '10px', 
+          right: '10px', 
+          background: '#007bff', 
+          color: 'white', 
+          padding: '8px 12px', 
+          borderRadius: '4px', 
+          fontSize: '12px',
+          zIndex: 1000
+        }}>
+          Refreshing data...
+        </div>
+      )}
       <AccountSelector
         selectedAccounts={selectedAccounts}
         onAccountSelect={setSelectedAccounts}
