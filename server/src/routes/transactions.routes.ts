@@ -117,7 +117,8 @@ router.post("/", async (req: Request<{}, {}, Post_Transaction_Req>, res: Respons
       timestamp: newTransaction.timestamp, // simulation time, replace with getSimTime() if available
       description,
       from: from_account_number,
-      to: to_account_number
+      to: to_account_number,
+      from_company_name: req.teamId
     };
 
     switch(to_bank_name) {
