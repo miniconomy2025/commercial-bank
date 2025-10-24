@@ -36,18 +36,24 @@ export class HttpClient {
     body?: any;
     timeoutMs?: number;
   }): Observable<HttpClientResponse<T>> {
-    if (!appConfig.isProd) return new Observable(); // Only make external requests in prod
+    if (!appConfig.isProd) {
+      return new Observable((subscriber) => {
+        subscriber.complete();
+      });
+    }
 
     const {
       url,
       method = "GET",
-      headers = {
-        'Client-Id': 'Commercial-Bank'
-      },
+      headers: customHeaders,
       body,
       timeoutMs = appConfig.timeout,
     } = options;
 
+    const headers: Record<string, string> = {
+      'Client-Id': 'Commercial-Bank',
+      ...customHeaders,
+    };
 
     const requestBody = body ? JSON.stringify(body) : undefined;
 
@@ -79,6 +85,14 @@ export class HttpClient {
         res.on("end", () => {
           try {
             if (!rawData) {
+              if (res.statusCode === 204 || res.statusCode === 205) {
+                subscriber.next({
+                  statusCode: res.statusCode,
+                  data: {} as T,
+                });
+                subscriber.complete();
+                return;
+              }
               subscriber.error(
                 this.wrapError(
                   new Error("Empty response body"),
