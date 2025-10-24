@@ -11,6 +11,7 @@ import {
   Get_Loan_Req
 } from '../types/endpoint.types';
 import db from '../config/db.config';
+import { calcLoanInterestRate } from './simulation.routes';
 
 //=============== /loan ==============//
 
@@ -160,7 +161,7 @@ router.post("/prime_rate",async (req,res) =>{
   if (teamId!=="thoh"){
     res.status(400).json({ success: false, error: "onlyThohCanChangePrimeRate" });
   } else {
-    setLoanInterestRate(Number(prime_rate));
+    setLoanInterestRate(calcLoanInterestRate(Number(prime_rate)));
     res.status(200).json({ success: true, prime_rate });
   }
 });

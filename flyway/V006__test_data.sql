@@ -1,5 +1,8 @@
 -- Dummy data for testing environment
 
+-- Disable balance validation trigger during test data insertion
+ALTER TABLE transactions DISABLE TRIGGER validate_balance_before_transaction;
+
 INSERT INTO accounts (account_number, team_id, notification_url, created_at, closed_at) VALUES
 ('200000000001', 'team-001',        'https://test1.example.com/notify',  1700000000.00, NULL),
 ('200000000002', 'team-002',        'https://test2.example.com/notify',  1700000001.00, NULL),
@@ -98,7 +101,7 @@ INSERT INTO transactions (transaction_number, "from", "to", amount, description,
 ('TXN000000039', 19, 9,  145.75,   'Transfer 39',    1, 1700001038.00),
 ('TXN000000040', 20, 10, 285.00,   'Transfer 40',    1, 1700001039.00),
 ('TXN000000041', 2,  1,  600.00,   'Large transfer', 1, 1700001040.00),
-('TXN000000042', 24, 23, 10000.00, 'Capital',        1, 1700001041.00);
+('TXN000000042', 24, 23, 10000000.00, 'Capital',        1, 1700001041.00);
 
 INSERT INTO loans (loan_number, initial_transaction_id, interest_rate, started_at, write_off) VALUES
 ('LOAN00000001', 1,  5.50000, 1700001000.00, FALSE),
@@ -143,3 +146,6 @@ INSERT INTO loan_payments (loan_id, transaction_id, is_interest) VALUES
 (18, 38, FALSE),
 (19, 39, TRUE),
 (20, 40, FALSE);
+
+-- Re-enable balance validation trigger
+ALTER TABLE transactions ENABLE TRIGGER validate_balance_before_transaction;
