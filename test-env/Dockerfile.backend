@@ -1,12 +1,15 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache curl wget
+RUN apk add --no-cache curl wget bash openjdk17-jre
 RUN npm install -g pnpm
 
 # Install Flyway
 RUN wget -qO- https://download.red-gate.com/maven/release/com/redgate/flyway/flyway-commandline/11.14.1/flyway-commandline-11.14.1-linux-x64.tar.gz | tar xvz \
     && mv flyway-11.14.1 /opt/flyway \
+    && rm -rf /opt/flyway/jre \
     && ln -s /opt/flyway/flyway /usr/local/bin/flyway
+
+ENV PATH="/usr/local/bin:/opt/flyway:${PATH}"
 
 WORKDIR /app
 
@@ -14,7 +17,6 @@ COPY package*.json pnpm-lock.yaml ./
 RUN pnpm install
 
 COPY . .
-COPY .env.test .
 RUN pnpm run build
 
 EXPOSE 3000

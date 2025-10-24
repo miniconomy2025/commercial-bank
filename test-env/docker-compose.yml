@@ -15,16 +15,16 @@ services:
       timeout: 5s
       retries: 5
 
-  flyway:
-    image: flyway/flyway:9
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ../flyway:/flyway/sql
-    command: -url=jdbc:postgresql://postgres:5432/commercial-bank -user=postgres -password=postgres -locations=filesystem:/flyway/sql migrate
-    environment:
-      - FLYWAY_BASELINE_ON_MIGRATE=true
+  # flyway:
+  #   image: flyway/flyway:9
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ../flyway:/flyway/sql
+  #   command: -url=jdbc:postgresql://postgres:5432/commercial-bank -user=postgres -password=postgres -locations=filesystem:/flyway/sql migrate
+  #   environment:
+  #     - FLYWAY_BASELINE_ON_MIGRATE=true
 
   backend:
     stdin_open: true
@@ -32,9 +32,9 @@ services:
     build:
       context: ../server
       dockerfile: ../test-env/Dockerfile.backend
-    depends_on:
-      flyway:
-        condition: service_completed_successfully
+    depends_on: []
+      # flyway:
+      #   condition: service_completed_successfully
     environment:
       NODE_ENV: test
       DB_HOST: postgres
@@ -72,18 +72,28 @@ services:
       context: .
       dockerfile: Dockerfile.test-runner
     depends_on:
-      - backend
-        # condition: service_healthy
-      - frontend
-        # condition: service_started
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
     volumes:
       - ../server:/server
       - ../frontend:/frontend
+      - ../flyway:/flyway
     environment:
       BACKEND_URL: http://backend:3000
       FRONTEND_URL: http://frontend:5173
       TERM: xterm-256color
       FORCE_COLOR: 1
+      NODE_ENV: test
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: commercial-bank
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/commercial-bank
 
 volumes:
   postgres_data:
