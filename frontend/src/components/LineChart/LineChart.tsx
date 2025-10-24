@@ -34,6 +34,13 @@ const Chart: React.FC<ChartProps> = ({ title, data, xKey, yKeys, colors = DEFAUL
     );
   }
 
+  // Calculate Y-axis domain to prevent offsetting
+  const allValues = data.flatMap(item => yKeys.map(key => Number(item[key]) || 0));
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues);
+  const padding = (maxValue - minValue) * 0.1;
+  const yDomain = [Math.max(0, minValue - padding), maxValue + padding];
+
   return (
     <section className="chart">
       <h3 className="chart-title">{title}</h3>
@@ -41,8 +48,8 @@ const Chart: React.FC<ChartProps> = ({ title, data, xKey, yKeys, colors = DEFAUL
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={xKey} />
-          <YAxis />
-          <Tooltip />
+          <YAxis domain={yDomain} tickFormatter={(value) => value.toLocaleString()} />
+          <Tooltip formatter={(value) => [Number(value).toLocaleString(), '']} />
           <Legend />
           {yKeys.map((key, index) => (
             <Line

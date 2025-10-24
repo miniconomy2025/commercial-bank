@@ -18,13 +18,30 @@ import appConfig from "../config/app.config";
 const router = Router();
 const httpClient = new HttpClient();
 
+export const PRIME_RATE_DIVISOR = 3;
+export const INTEREST_CHARGE_INTERVAL = 30;
+
+export function calcLoanInterestRate(primeRatePerYear: number, durationDays: number = INTEREST_CHARGE_INTERVAL): number {
+  const prNorm = primeRatePerYear / 100.0;
+  const prPerDay = prNorm / 300.0;
+  return prPerDay * durationDays;
+}
+
+let dayCounter = 0;
+
 async function onEachDay() {
   try {
     logger.info('Daily loan processing started');
+
     await attemptInstalments();
     logger.info('Installment processing completed');
-    await chargeInterest();
-    logger.info('Interest charging completed');
+
+    if (dayCounter !== 0 && dayCounter % INTEREST_CHARGE_INTERVAL == 0) {
+      await chargeInterest();
+      logger.info(`Interest collected on day ${dayCounter}`);
+    }
+    else { logger.info(`No interest collected on day ${dayCounter}`); }
+
   } catch (error) {
     logger.error('Error in daily loan processing:', error);
   }
@@ -33,6 +50,7 @@ async function onEachDay() {
 router.post("/", async (req, res) => {
   console.log("========== START SIMULATION ==========")
     try {
+        dayCounter = 0;
         const { epochStartTime } = snakeToCamelCaseMapper(req.body);
         console.log(" - START TIME:", epochStartTime);
 
@@ -45,16 +63,24 @@ router.post("/", async (req, res) => {
         }
 
         const { investmentValue, primeRate } = snakeToCamelCaseMapper(balanceData);
+        
+        if (investmentValue === undefined || investmentValue === null) {
+          res.status(400).json({ success: false, error: "invalidPayload", details: "investment_value is required" });
+          return;
+        }
         console.log(" - INVESTMENT VALUE:", investmentValue);
         console.log(" - PRIME RATE:", primeRate);
+
+        setLoanInterestRate(calcLoanInterestRate(Number(primeRate)));
+        setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) / 10);
 
         console.log("--------- RESETTING DB ----------")
         await resetDB(epochStartTime);
 
-        setLoanInterestRate(Number(primeRate));
-        setLoanCap(investmentValue * (1 - appConfig.fractionalReserve) /10);
         const fromAccountNumber = await getAccountFromTeamId('thoh').then(account => account?.account_number);
+
         initSimulation(epochStartTime + 10, onEachDay); // Offset by 10ms to account for minor network/request latency
+
         const toAccountNumber = await getAccountFromTeamId('commercial-bank').then(account => account?.account_number);
         if (!toAccountNumber) {
             res.status(404).json({ success: false, error: "commercialBankAccountNotFound" });
@@ -64,7 +90,9 @@ router.post("/", async (req, res) => {
             res.status(404).json({ success: false, error: "thohAccountNotFound" });
             return;
         }
+
         await createTransaction(toAccountNumber, fromAccountNumber, investmentValue, `Simulation start with balance ${investmentValue}`, 'thoh', 'commercial-bank');
+
         res.status(200).send({ success: true, route: `${appConfig.thohHost}/orders/payments` });
     } catch (error) {
         console.log("Error starting simulation:", error);
