@@ -22,9 +22,14 @@
 export TERM=xterm-256color
 export FORCE_COLOR=1
 
+
+# printf "\n\033[1;34m===== FLYWAY CHECK =====\033[0m\n"
+# flyway --version
+
 # Run backend tests
 printf "\n\033[1;34m===== BACKEND TESTS =====\033[0m\n"
 cd /server
+# flyway --version
 CI=true pnpm install
 CI=true pnpm test-env
 
