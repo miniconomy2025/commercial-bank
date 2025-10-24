@@ -3,10 +3,17 @@ import { test, expect } from '@playwright/test';
 test.describe('Account Statistics E2E', () => {
   test('should display account statistics when navigating to Individual Account Statistics tab', async ({ page }) => {
     // Navigate to the frontend with a test client ID
-    await page.goto('/?clientId=test-client');
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10000 });
+
+    // Debug: Check if page loaded at all
+    const title = await page.title();
+    // console.log('Page title:', title);
     
-    // Wait for the page to load
-    await expect(page.locator('h1')).toContainText('Banking Dashboard');
+    // Wait for React to render
+    await page.waitForSelector('#root', { timeout: 15000 });
+    
+    // Wait for the page to load with increased timeout
+    await expect(page.locator('h1')).toContainText('Banking Dashboard', { timeout: 15000 });
     
     // Click on Individual Account Statistics tab
     await page.click('button:has-text("Individual Account Statistics")');
@@ -52,7 +59,17 @@ test.describe('Account Statistics E2E', () => {
 
   test('should handle API errors gracefully', async ({ page }) => {
     // Navigate to the frontend
-    await page.goto('/?clientId=invalid-client');
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    
+    // Debug: Check if page loaded at all
+    const title = await page.title();
+    // console.log('Page title:', title);
+    
+    // Wait for React to render
+    await page.waitForSelector('#root', { timeout: 15000 });
+    
+    // Wait for the page to load
+    await expect(page.locator('h1')).toContainText('Banking Dashboard', { timeout: 15000 });
     
     // Click on Individual Account Statistics tab
     await page.click('button:has-text("Individual Account Statistics")');

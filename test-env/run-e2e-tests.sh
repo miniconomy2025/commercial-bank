@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "Starting E2E test environment..."
 
 # Start all services
-docker compose up -d postgres flyway backend frontend
+docker compose up -d postgres backend frontend
 
 # Wait for services to be ready
 echo "Waiting for services to be ready..."
@@ -19,7 +19,7 @@ curl -f http://localhost:5173 || echo "Frontend check failed"
 
 # Run E2E tests
 echo "Running E2E tests..."
-docker compose run --rm --service-ports e2e-tests
+docker compose run --rm e2e-tests
 
 # Capture exit code
 EXIT_CODE=$?

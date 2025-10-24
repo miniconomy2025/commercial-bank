@@ -1,10 +1,12 @@
 FROM mcr.microsoft.com/playwright:v1.40.0-focal
 
+RUN npm install -g pnpm
+
 WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm install
+RUN pnpm install
 
 # Copy test configuration and files
 COPY playwright.config.ts ./
@@ -14,4 +16,6 @@ COPY tests/ ./tests/
 # Install browsers
 RUN npx playwright install
 
-CMD ["npm", "run", "test:e2e"]
+CMD ["pnpm", "run", "test:e2e"]
+
+RUN npm install -g pnpm

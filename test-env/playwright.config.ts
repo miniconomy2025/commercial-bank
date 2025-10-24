@@ -7,9 +7,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  timeout: 60000,
   use: {
     baseURL: process.env.FRONTEND_URL || 'http://localhost:5173',
     trace: 'on-first-retry',
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
   },
   projects: [
     {
